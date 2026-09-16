@@ -22,6 +22,7 @@ jobs:
           repository: naver/prism-live-studio
           submodules: recursive
           path: prism-src
+          fetch-depth: 0
 
       - name: Setup MSBuild & Visual Studio 2022
         uses: microsoft/setup-msbuild@v2
@@ -41,6 +42,9 @@ jobs:
           echo "QT631=$QTDIR" >> $GITHUB_ENV
           echo "QTDIR=$QTDIR" >> $GITHUB_ENV
           echo "QT_ROOT=$QTDIR" >> $GITHUB_ENV
+          echo "QTDIR_RelWithDebInfo=$QTDIR" >> $GITHUB_ENV
+          echo "QTDIR_Release=$QTDIR" >> $GITHUB_ENV
+          echo "QTDIR_Debug=$QTDIR" >> $GITHUB_ENV
 
       - name: Apply Velora Studio Branding, Colors & Ingest Presets
         shell: bash
@@ -52,12 +56,14 @@ jobs:
         working-directory: prism-src/build/windows
         run: |
           echo QT631 is %QT631%
+          echo QTDIR is %QTDIR%
           configure.cmd
 
-      - name: Build Velora Studio (Release)
+      - name: Build Velora Studio (RelWithDebInfo)
         working-directory: prism-src/src/prism-live-studio/build
+        shell: cmd
         run: |
-          msbuild prism-live-studio.sln /p:Configuration=Release /p:Platform=x64 /m /verbosity:minimal || msbuild prism-live-studio.sln /p:Configuration=RelWithDebInfo /p:Platform=x64 /m /verbosity:minimal
+          msbuild prism-live-studio.sln /p:Configuration=RelWithDebInfo /p:Platform=x64 /m /verbosity:minimal
 
       - name: Package Velora Studio Artifacts
         shell: bash
@@ -66,10 +72,10 @@ jobs:
           echo "Searching and packaging compiled Velora Studio binaries..."
           find prism-src -type f \( -name "*.exe" -o -name "*.dll" \) ! -path "*/.git/*" -exec cp -t dist {} + 2>/dev/null || true
           if [ -d "prism-src/bin" ]; then
-            cp -r prism-src/bin dist/ 2>/dev/null || true
+            cp -r prism-src/bin/* dist/ 2>/dev/null || true
           fi
           if [ -d "prism-src/src/prism-live-studio/build/rundir" ]; then
-            cp -r prism-src/src/prism-live-studio/build/rundir dist/ 2>/dev/null || true
+            cp -r prism-src/src/prism-live-studio/build/rundir/* dist/ 2>/dev/null || true
           fi
           ls -la dist/ || true
 
