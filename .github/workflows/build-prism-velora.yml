@@ -72,24 +72,29 @@ jobs:
         run: |
           mkdir -p dist/bin/64bit dist/data dist/obs-plugins/64bit
           
-          # 1. Copy full PRISM runtime bin output tree
+          # 1. Copy full PRISM runtime bin output trees (RelWithDebInfo, Release, and bin)
           echo "Copying PRISM output tree..."
-          if [ -d "prism-src/bin/prism/windows/Release" ]; then
-            cp -r prism-src/bin/prism/windows/Release/* dist/ 2>/dev/null || true
-          elif [ -d "prism-src/bin/prism" ]; then
-            cp -r prism-src/bin/prism/* dist/ 2>/dev/null || true
-          fi
+          for outdir in prism-src/bin/prism/windows/RelWithDebInfo prism-src/bin/prism/windows/Release prism-src/bin/prism prism-src/bin; do
+            if [ -d "$outdir" ]; then
+              echo "Copying from $outdir to dist..."
+              cp -r "$outdir"/* dist/ 2>/dev/null || true
+            fi
+          done
           
-          # 2. Copy ALL third-party dependencies from obs-deps (FFmpeg, libcurl, pthreads, srt, etc.)
-          echo "Bundling obs-deps (FFmpeg avcodec/avformat, libcurl, pthreads)..."
+          # 2. Copy ALL third-party dependencies from obs-deps (FFmpeg avcodec/avformat, libcurl, pthreads, srt, etc.)
+          echo "Bundling obs-deps..."
           find prism-src -path "*/.deps/*" -name "*.dll" -exec cp {} dist/bin/64bit/ \; 2>/dev/null || true
           find prism-src -path "*/.deps/*" -name "*.dll" -exec cp {} dist/ \; 2>/dev/null || true
           
-          # 3. Copy compiled build DLLs and executables
-          echo "Bundling compiled DLLs and EXEs..."
-          find prism-src/src/prism-live-studio/build/Release -type f \( -name "*.dll" -o -name "*.exe" \) ! -path "*/.git/*" -exec cp {} dist/bin/64bit/ \; 2>/dev/null || true
-          find prism-src/src/obs-studio/build/Release -type f \( -name "*.dll" -o -name "*.exe" \) ! -path "*/.git/*" -exec cp {} dist/bin/64bit/ \; 2>/dev/null || true
-          
+          # 3. Find and copy ALL built DLLs across the entire source & build tree (common-libs, libui, liblog, libutils-api, libobs, etc.)
+          echo "Bundling all compiled DLLs..."
+          find prism-src/src -name "*.dll" -exec cp {} dist/bin/64bit/ \; 2>/dev/null || true
+          find prism-src/src -name "*.dll" -exec cp {} dist/ \; 2>/dev/null || true
+          find prism-src/build -name "*.dll" -exec cp {} dist/bin/64bit/ \; 2>/dev/null || true
+          find prism-src/build -name "*.dll" -exec cp {} dist/ \; 2>/dev/null || true
+          find prism-src/bin -name "*.dll" -exec cp {} dist/bin/64bit/ \; 2>/dev/null || true
+          find prism-src/bin -name "*.dll" -exec cp {} dist/ \; 2>/dev/null || true
+
           # 4. Copy all Data and Resource folders (themes, services, shaders, locales)
           echo "Bundling data assets and themes..."
           find prism-src -type d -path "*/UI/data" | while read -r d; do
@@ -108,6 +113,13 @@ jobs:
           cp -r "$QTDIR/plugins" dist/ 2>/dev/null || true
           
           # 6. Ensure VeloraStudio.exe exists in root and bin/64bit
+          for exename in PRISMLiveStudio.exe VeloraStudio.exe obs64.exe; do
+            find prism-src -name "$exename" | while read -r src_exe; do
+              cp "$src_exe" dist/bin/64bit/ 2>/dev/null || true
+              cp "$src_exe" dist/ 2>/dev/null || true
+            done
+          done
+
           if [ -f "dist/bin/64bit/PRISMLiveStudio.exe" ]; then
             cp "dist/bin/64bit/PRISMLiveStudio.exe" "dist/bin/64bit/VeloraStudio.exe"
             cp "dist/bin/64bit/PRISMLiveStudio.exe" "dist/VeloraStudio.exe"
@@ -119,23 +131,25 @@ jobs:
           
           # 7. Create 1-Click Root Launcher script
           cat << 'EOF' > "dist/Launch Velora Studio.bat"
-          @echo off
-          cd /d "%~dp0bin\64bit"
-          if exist "VeloraStudio.exe" (
-              start "" "VeloraStudio.exe" %*
-          ) else if exist "PRISMLiveStudio.exe" (
-              start "" "PRISMLiveStudio.exe" %*
-          ) else if exist "obs64.exe" (
-              start "" "obs64.exe" %*
-          )
-          EOF
+@echo off
+cd /d "%~dp0bin\64bit"
+if exist "VeloraStudio.exe" (
+    start "" "VeloraStudio.exe" %*
+) else if exist "PRISMLiveStudio.exe" (
+    start "" "PRISMLiveStudio.exe" %*
+) else if exist "obs64.exe" (
+    start "" "obs64.exe" %*
+)
+EOF
           
           # 8. Run windeployqt
           find dist -name "*.exe" | while read -r exe; do
             windeployqt --release --no-translations "$exe" 2>/dev/null || true
           done
           
+          echo "=== Content of dist root ==="
           ls -la dist/ || true
+          echo "=== Content of dist/bin/64bit ==="
           ls -la dist/bin/64bit/ || true
 
       - name: Upload Velora Studio Build Artifact
