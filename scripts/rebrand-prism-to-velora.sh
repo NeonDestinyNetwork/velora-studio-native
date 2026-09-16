@@ -23,14 +23,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # 1. Inject Velora Services (WHIP + RTMP)
-echo "[1/6] Injecting Velora Service Definitions..."
+echo "[1/7] Injecting Velora Service Definitions..."
 find "$TARGET_DIR" -type d -path "*/plugins/obs-outputs/data" | while read -r dest; do
     echo "Copying services.json to $dest"
     cp "$ROOT_DIR/config/services.json" "$dest/"
 done
 
 # 2. Inject Velora Theme & Styles
-echo "[2/6] Injecting Velora Dark & Gold Themes..."
+echo "[2/7] Injecting Velora Dark & Gold Themes..."
 find "$TARGET_DIR" -type d -path "*/UI/data/themes" | while read -r dest; do
     echo "Copying themes to $dest"
     cp "$ROOT_DIR/theme/VeloraDark.qss" "$dest/"
@@ -38,7 +38,7 @@ find "$TARGET_DIR" -type d -path "*/UI/data/themes" | while read -r dest; do
 done
 
 # 3. Update Colors in Existing QSS/CSS Themes (Yellow -> Velora Gold, Dark -> Obsidian)
-echo "[3/6] Overriding UI Theme Palettes..."
+echo "[3/7] Overriding UI Theme Palettes..."
 find "$TARGET_DIR" -type f \( -name "*.qss" -o -name "*.css" \) ! -path "*/.git/*" | while read -r file; do
     sed -i 's/#FEE500/#D4AF37/gi' "$file" 2>/dev/null || true
     sed -i 's/#F3E000/#D4AF37/gi' "$file" 2>/dev/null || true
@@ -49,7 +49,7 @@ find "$TARGET_DIR" -type f \( -name "*.qss" -o -name "*.css" \) ! -path "*/.git/
 done
 
 # 4. Update User-Facing Locale Strings (Translations & UI Display Strings Only)
-echo "[4/6] Updating User-Facing Display Strings..."
+echo "[4/7] Updating User-Facing Display Strings..."
 find "$TARGET_DIR" -type f \( -name "*.ini" -o -name "*.ts" \) -path "*/locale/*" | while read -r file; do
     sed -i 's/PRISM Live Studio/Velora Studio/g' "$file" 2>/dev/null || true
     sed -i 's/PRISM Live/Velora Studio/g' "$file" 2>/dev/null || true
@@ -57,14 +57,14 @@ find "$TARGET_DIR" -type f \( -name "*.ini" -o -name "*.ts" \) -path "*/locale/*
 done
 
 # 5. Fix CMake compatibility checks (obs-websocket legacy_check)
-echo "[5/6] Patching CMake legacy checks..."
+echo "[5/7] Patching CMake legacy checks..."
 find "$TARGET_DIR" -type f -name "CMakeLists.txt" ! -path "*/.git/*" | while read -r file; do
     sed -i 's/legacy_check()/message(STATUS "legacy_check bypassed")/g' "$file" 2>/dev/null || true
     sed -i 's/legacy_check(.[^)]*)/message(STATUS "legacy_check bypassed")/g' "$file" 2>/dev/null || true
 done
 
 # 6. Disable Treat Warnings As Errors (/WX) & suppress C4996 deprecation warning globally
-echo "[6/6] Disabling /WX and suppressing C4996..."
+echo "[6/7] Disabling /WX and suppressing C4996..."
 find "$TARGET_DIR" -type f \( -name "*.cmake" -o -name "CMakeLists.txt" \) ! -path "*/.git/*" | while read -r file; do
     sed -i 's/\/WX//g' "$file" 2>/dev/null || true
     sed -i 's/-WX//g' "$file" 2>/dev/null || true
@@ -73,6 +73,12 @@ done
 find "$TARGET_DIR" -type f -name "Config.cpp" ! -path "*/.git/*" | while read -r file; do
     echo "Injecting pragma into $file"
     sed -i '1s/^/#pragma warning(disable: 4996)\n/' "$file" 2>/dev/null || true
+done
+
+# 7. Fix Qt6 compatibility: QEvent::DevicePixelRatioChange
+echo "[7/7] Patching Qt6 QEvent::DevicePixelRatioChange..."
+find "$TARGET_DIR" -type f \( -name "*.cpp" -o -name "*.h" \) ! -path "*/.git/*" | while read -r file; do
+    sed -i 's/QEvent::DevicePixelRatioChange/QEvent::Type(999)/g' "$file" 2>/dev/null || true
 done
 
 echo "======================================================================"
