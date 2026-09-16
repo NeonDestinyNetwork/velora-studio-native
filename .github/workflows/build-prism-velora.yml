@@ -90,6 +90,14 @@ jobs:
           fi
           cp -r "$QTDIR/plugins" dist/ 2>/dev/null || true
           
+          # Ensure VeloraStudio.exe exists in root and bin folders
+          if [ -f "dist/PRISMLiveStudio.exe" ]; then
+            cp "dist/PRISMLiveStudio.exe" "dist/VeloraStudio.exe"
+          fi
+          if [ -f "dist/bin/64bit/PRISMLiveStudio.exe" ]; then
+            cp "dist/bin/64bit/PRISMLiveStudio.exe" "dist/bin/64bit/VeloraStudio.exe"
+          fi
+          
           # Run windeployqt to guarantee all dependencies are packaged
           find dist -name "*.exe" | while read -r exe; do
             windeployqt --release --no-translations "$exe" 2>/dev/null || true
