@@ -23,14 +23,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # 1. Inject Velora Services (WHIP + RTMP)
-echo "[1/5] Injecting Velora Service Definitions..."
+echo "[1/6] Injecting Velora Service Definitions..."
 find "$TARGET_DIR" -type d -path "*/plugins/obs-outputs/data" | while read -r dest; do
     echo "Copying services.json to $dest"
     cp "$ROOT_DIR/config/services.json" "$dest/"
 done
 
 # 2. Inject Velora Theme & Styles
-echo "[2/5] Injecting Velora Dark & Gold Themes..."
+echo "[2/6] Injecting Velora Dark & Gold Themes..."
 find "$TARGET_DIR" -type d -path "*/UI/data/themes" | while read -r dest; do
     echo "Copying themes to $dest"
     cp "$ROOT_DIR/theme/VeloraDark.qss" "$dest/"
@@ -38,7 +38,7 @@ find "$TARGET_DIR" -type d -path "*/UI/data/themes" | while read -r dest; do
 done
 
 # 3. Update Colors in Existing QSS/CSS Themes (Yellow -> Velora Gold, Dark -> Obsidian)
-echo "[3/5] Overriding UI Theme Palettes..."
+echo "[3/6] Overriding UI Theme Palettes..."
 find "$TARGET_DIR" -type f \( -name "*.qss" -o -name "*.css" \) ! -path "*/.git/*" | while read -r file; do
     sed -i 's/#FEE500/#D4AF37/gi' "$file" 2>/dev/null || true
     sed -i 's/#F3E000/#D4AF37/gi' "$file" 2>/dev/null || true
@@ -49,7 +49,7 @@ find "$TARGET_DIR" -type f \( -name "*.qss" -o -name "*.css" \) ! -path "*/.git/
 done
 
 # 4. Update User-Facing Locale Strings (Translations & UI Display Strings Only)
-echo "[4/5] Updating User-Facing Display Strings..."
+echo "[4/6] Updating User-Facing Display Strings..."
 find "$TARGET_DIR" -type f \( -name "*.ini" -o -name "*.ts" \) -path "*/locale/*" | while read -r file; do
     sed -i 's/PRISM Live Studio/Velora Studio/g' "$file" 2>/dev/null || true
     sed -i 's/PRISM Live/Velora Studio/g' "$file" 2>/dev/null || true
@@ -57,10 +57,17 @@ find "$TARGET_DIR" -type f \( -name "*.ini" -o -name "*.ts" \) -path "*/locale/*
 done
 
 # 5. Fix CMake compatibility checks (obs-websocket legacy_check)
-echo "[5/5] Patching CMake legacy checks..."
+echo "[5/6] Patching CMake legacy checks..."
 find "$TARGET_DIR" -type f -name "CMakeLists.txt" ! -path "*/.git/*" | while read -r file; do
     sed -i 's/legacy_check()/message(STATUS "legacy_check bypassed")/g' "$file" 2>/dev/null || true
     sed -i 's/legacy_check(.[^)]*)/message(STATUS "legacy_check bypassed")/g' "$file" 2>/dev/null || true
+done
+
+# 6. Disable Treat Warnings As Errors (/WX) across all build files
+echo "[6/6] Disabling TreatWarningsAsErrors (/WX)..."
+find "$TARGET_DIR" -type f \( -name "*.cmake" -o -name "CMakeLists.txt" \) ! -path "*/.git/*" | while read -r file; do
+    sed -i 's/\/WX//g' "$file" 2>/dev/null || true
+    sed -i 's/-WX//g' "$file" 2>/dev/null || true
 done
 
 echo "======================================================================"

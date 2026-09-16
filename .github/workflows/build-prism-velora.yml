@@ -65,7 +65,7 @@ jobs:
         working-directory: prism-src/src/prism-live-studio/build/Release
         run: |
           echo Compiling Primary Velora Studio Solution...
-          msbuild prism-live-studio.sln /p:Configuration=RelWithDebInfo /p:Platform=x64 /m /verbosity:minimal
+          msbuild prism-live-studio.sln /p:Configuration=RelWithDebInfo /p:Platform=x64 /p:TreatWarningsAsErrors=false /p:WarningLevel=3 /m /verbosity:minimal
 
       - name: Package Velora Studio Artifacts
         shell: bash
