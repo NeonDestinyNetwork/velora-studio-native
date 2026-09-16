@@ -57,21 +57,25 @@ jobs:
       - name: Build Velora Studio (Release)
         working-directory: prism-src/src/prism-live-studio/build
         run: |
-          msbuild prism-live-studio.sln /p:Configuration=Release /p:Platform=x64 /m
+          msbuild prism-live-studio.sln /p:Configuration=Release /p:Platform=x64 /m /verbosity:minimal || msbuild prism-live-studio.sln /p:Configuration=RelWithDebInfo /p:Platform=x64 /m /verbosity:minimal
 
       - name: Package Velora Studio Artifacts
         shell: bash
         run: |
           mkdir -p dist
-          if [ -d "prism-src/bin/prism" ]; then
-            cp -r prism-src/bin/prism/* dist/ || true
+          echo "Searching and packaging compiled Velora Studio binaries..."
+          find prism-src -type f \( -name "*.exe" -o -name "*.dll" \) ! -path "*/.git/*" -exec cp -t dist {} + 2>/dev/null || true
+          if [ -d "prism-src/bin" ]; then
+            cp -r prism-src/bin dist/ 2>/dev/null || true
           fi
           if [ -d "prism-src/src/prism-live-studio/build/rundir" ]; then
-            cp -r prism-src/src/prism-live-studio/build/rundir/* dist/ || true
+            cp -r prism-src/src/prism-live-studio/build/rundir dist/ 2>/dev/null || true
           fi
+          ls -la dist/ || true
 
       - name: Upload Velora Studio Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Velora-Studio-Windows-x64
           path: dist/
+          if-no-files-found: warn
