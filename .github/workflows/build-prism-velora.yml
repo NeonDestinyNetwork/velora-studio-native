@@ -67,43 +67,76 @@ jobs:
           echo Compiling Primary Velora Studio Solution...
           msbuild prism-live-studio.sln /p:Configuration=RelWithDebInfo /p:Platform=x64 /p:TreatWarningsAsErrors=false /p:WarningLevel=3 /m /verbosity:minimal
 
-      - name: Package Velora Studio Artifacts (with Full Qt Runtime & Dependencies)
+      - name: Package Complete Velora Studio Distribution (Full FFmpeg, OBS-Deps & Qt Suite)
         shell: bash
         run: |
-          mkdir -p dist
-          echo "Packaging compiled binaries and output tree..."
+          mkdir -p dist/bin/64bit dist/data dist/obs-plugins/64bit
+          
+          # 1. Copy full PRISM runtime bin output tree
+          echo "Copying PRISM output tree..."
           if [ -d "prism-src/bin/prism/windows/Release" ]; then
             cp -r prism-src/bin/prism/windows/Release/* dist/ 2>/dev/null || true
           elif [ -d "prism-src/bin/prism" ]; then
             cp -r prism-src/bin/prism/* dist/ 2>/dev/null || true
           fi
           
-          # Find all build binaries (.exe, .dll)
-          find prism-src/src/prism-live-studio/build/Release -type f \( -name "*.exe" -o -name "*.dll" \) ! -path "*/.git/*" -exec cp -t dist {} + 2>/dev/null || true
+          # 2. Copy ALL third-party dependencies from obs-deps (FFmpeg, libcurl, pthreads, srt, etc.)
+          echo "Bundling obs-deps (FFmpeg avcodec/avformat, libcurl, pthreads)..."
+          find prism-src -path "*/.deps/*" -name "*.dll" -exec cp {} dist/bin/64bit/ \; 2>/dev/null || true
+          find prism-src -path "*/.deps/*" -name "*.dll" -exec cp {} dist/ \; 2>/dev/null || true
           
-          # Bundle all required Qt 6.5.3 runtime DLLs and plugins
-          echo "Bundling Qt runtime DLLs and platforms..."
-          cp -r "$QTDIR/bin/"*.dll dist/ 2>/dev/null || true
-          if [ -d "dist/bin/64bit" ]; then
-            cp -r "$QTDIR/bin/"*.dll dist/bin/64bit/ 2>/dev/null || true
-            cp -r "$QTDIR/plugins" dist/bin/64bit/ 2>/dev/null || true
+          # 3. Copy compiled build DLLs and executables
+          echo "Bundling compiled DLLs and EXEs..."
+          find prism-src/src/prism-live-studio/build/Release -type f \( -name "*.dll" -o -name "*.exe" \) ! -path "*/.git/*" -exec cp {} dist/bin/64bit/ \; 2>/dev/null || true
+          find prism-src/src/obs-studio/build/Release -type f \( -name "*.dll" -o -name "*.exe" \) ! -path "*/.git/*" -exec cp {} dist/bin/64bit/ \; 2>/dev/null || true
+          
+          # 4. Copy all Data and Resource folders (themes, services, shaders, locales)
+          echo "Bundling data assets and themes..."
+          find prism-src -type d -path "*/UI/data" | while read -r d; do
+            cp -r "$d"/* dist/data/ 2>/dev/null || true
+          done
+          if [ -d "dist/data" ]; then
+            mkdir -p dist/bin/64bit/data
+            cp -r dist/data/* dist/bin/64bit/data/ 2>/dev/null || true
           fi
+          
+          # 5. Bundle full Qt 6.5.3 runtime DLLs and plugins
+          echo "Bundling Qt 6.5.3 runtime DLLs..."
+          cp -r "$QTDIR/bin/"*.dll dist/bin/64bit/ 2>/dev/null || true
+          cp -r "$QTDIR/bin/"*.dll dist/ 2>/dev/null || true
+          cp -r "$QTDIR/plugins" dist/bin/64bit/ 2>/dev/null || true
           cp -r "$QTDIR/plugins" dist/ 2>/dev/null || true
           
-          # Ensure VeloraStudio.exe exists in root and bin folders
-          if [ -f "dist/PRISMLiveStudio.exe" ]; then
-            cp "dist/PRISMLiveStudio.exe" "dist/VeloraStudio.exe"
-          fi
+          # 6. Ensure VeloraStudio.exe exists in root and bin/64bit
           if [ -f "dist/bin/64bit/PRISMLiveStudio.exe" ]; then
             cp "dist/bin/64bit/PRISMLiveStudio.exe" "dist/bin/64bit/VeloraStudio.exe"
+            cp "dist/bin/64bit/PRISMLiveStudio.exe" "dist/VeloraStudio.exe"
+          fi
+          if [ -f "dist/PRISMLiveStudio.exe" ]; then
+            cp "dist/PRISMLiveStudio.exe" "dist/VeloraStudio.exe"
+            cp "dist/PRISMLiveStudio.exe" "dist/bin/64bit/VeloraStudio.exe" 2>/dev/null || true
           fi
           
-          # Run windeployqt to guarantee all dependencies are packaged
+          # 7. Create 1-Click Root Launcher script
+          cat << 'EOF' > "dist/Launch Velora Studio.bat"
+          @echo off
+          cd /d "%~dp0bin\64bit"
+          if exist "VeloraStudio.exe" (
+              start "" "VeloraStudio.exe" %*
+          ) else if exist "PRISMLiveStudio.exe" (
+              start "" "PRISMLiveStudio.exe" %*
+          ) else if exist "obs64.exe" (
+              start "" "obs64.exe" %*
+          )
+          EOF
+          
+          # 8. Run windeployqt
           find dist -name "*.exe" | while read -r exe; do
             windeployqt --release --no-translations "$exe" 2>/dev/null || true
           done
           
           ls -la dist/ || true
+          ls -la dist/bin/64bit/ || true
 
       - name: Upload Velora Studio Build Artifact
         uses: actions/upload-artifact@v4
