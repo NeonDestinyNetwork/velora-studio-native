@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Script: rebrand-prism-to-velora.sh
-# Purpose: Non-destructive theme and brand customization for PRISM Live Studio.
-#          Preserves internal C++ macros/symbols while updating user-facing
-#          branding, themes, services, and color schemes.
+# Purpose: Complete build preparation and Velora Studio branding for PRISM Live Studio.
 # ==============================================================================
 
 set -euo pipefail
@@ -16,29 +14,39 @@ if [ ! -d "$TARGET_DIR" ]; then
 fi
 
 echo "======================================================================"
-echo " Applying Safe Velora Studio Customization to: $TARGET_DIR"
+echo " Preparing Velora Studio Build & Customizations on: $TARGET_DIR"
 echo "======================================================================"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# 1. Inject Velora Services (WHIP + RTMP)
-echo "[1/7] Injecting Velora Service Definitions..."
+# 1. Pre-create expected build directory trees for CMake INTERFACE_INCLUDE_DIRECTORIES
+echo "[1/8] Creating required CMake build folders..."
+mkdir -p "$TARGET_DIR/src/obs-studio/build/Release/config"
+mkdir -p "$TARGET_DIR/src/obs-studio/build/RelWithDebInfo/config"
+mkdir -p "$TARGET_DIR/src/obs-studio/build/Debug/config"
+mkdir -p "$TARGET_DIR/src/prism-live-studio/build/Release/config"
+mkdir -p "$TARGET_DIR/src/prism-live-studio/build/RelWithDebInfo/config"
+mkdir -p "$TARGET_DIR/bin/prism/windows/Release"
+mkdir -p "$TARGET_DIR/bin/prism/windows/RelWithDebInfo"
+
+# 2. Inject Velora Services (WHIP + RTMP)
+echo "[2/8] Injecting Velora Service Definitions..."
 find "$TARGET_DIR" -type d -path "*/plugins/obs-outputs/data" | while read -r dest; do
     echo "Copying services.json to $dest"
     cp "$ROOT_DIR/config/services.json" "$dest/"
 done
 
-# 2. Inject Velora Theme & Styles
-echo "[2/7] Injecting Velora Dark & Gold Themes..."
+# 3. Inject Velora Theme & Styles
+echo "[3/8] Injecting Velora Dark & Gold Themes..."
 find "$TARGET_DIR" -type d -path "*/UI/data/themes" | while read -r dest; do
     echo "Copying themes to $dest"
     cp "$ROOT_DIR/theme/VeloraDark.qss" "$dest/"
     cp "$ROOT_DIR/theme/VeloraDark.ovt" "$dest/"
 done
 
-# 3. Update Colors in Existing QSS/CSS Themes (Yellow -> Velora Gold, Dark -> Obsidian)
-echo "[3/7] Overriding UI Theme Palettes..."
+# 4. Update Colors in Existing QSS/CSS Themes (Yellow -> Velora Gold, Dark -> Obsidian)
+echo "[4/8] Overriding UI Theme Palettes..."
 find "$TARGET_DIR" -type f \( -name "*.qss" -o -name "*.css" \) ! -path "*/.git/*" | while read -r file; do
     sed -i 's/#FEE500/#D4AF37/gi' "$file" 2>/dev/null || true
     sed -i 's/#F3E000/#D4AF37/gi' "$file" 2>/dev/null || true
@@ -48,23 +56,23 @@ find "$TARGET_DIR" -type f \( -name "*.qss" -o -name "*.css" \) ! -path "*/.git/
     sed -i 's/#2B2B2B/#131B3A/gi' "$file" 2>/dev/null || true
 done
 
-# 4. Update User-Facing Locale Strings (Translations & UI Display Strings Only)
-echo "[4/7] Updating User-Facing Display Strings..."
+# 5. Update User-Facing Locale Strings (Translations & UI Display Strings Only)
+echo "[5/8] Updating User-Facing Display Strings..."
 find "$TARGET_DIR" -type f \( -name "*.ini" -o -name "*.ts" \) -path "*/locale/*" | while read -r file; do
     sed -i 's/PRISM Live Studio/Velora Studio/g' "$file" 2>/dev/null || true
     sed -i 's/PRISM Live/Velora Studio/g' "$file" 2>/dev/null || true
     sed -i 's/PRISMLiveStudio/VeloraStudio/g' "$file" 2>/dev/null || true
 done
 
-# 5. Fix CMake compatibility checks (obs-websocket legacy_check)
-echo "[5/7] Patching CMake legacy checks..."
+# 6. Fix CMake compatibility checks
+echo "[6/8] Patching CMake legacy checks..."
 find "$TARGET_DIR" -type f -name "CMakeLists.txt" ! -path "*/.git/*" | while read -r file; do
     sed -i 's/legacy_check()/message(STATUS "legacy_check bypassed")/g' "$file" 2>/dev/null || true
     sed -i 's/legacy_check(.[^)]*)/message(STATUS "legacy_check bypassed")/g' "$file" 2>/dev/null || true
 done
 
-# 6. Disable Treat Warnings As Errors (/WX) & suppress C4996 deprecation warning globally
-echo "[6/7] Disabling /WX and suppressing C4996..."
+# 7. Disable /WX and suppress MSVC deprecation warnings
+echo "[7/8] Disabling /WX TreatWarningsAsErrors..."
 find "$TARGET_DIR" -type f \( -name "*.cmake" -o -name "CMakeLists.txt" \) ! -path "*/.git/*" | while read -r file; do
     sed -i 's/\/WX//g' "$file" 2>/dev/null || true
     sed -i 's/-WX//g' "$file" 2>/dev/null || true
@@ -74,16 +82,12 @@ find "$TARGET_DIR" -type f -name "Config.cpp" ! -path "*/.git/*" | while read -r
     sed -i '1s/^/#pragma warning(disable: 4996)\n/' "$file" 2>/dev/null || true
 done
 
-# 7. Patch Qt6 Compatibility (obs_source declaration and DPI change event)
-echo "[7/7] Patching Qt6 Compatibility fixes..."
+# 8. Qt6 Compatibility Patches
+echo "[8/8] Applying Qt6 Compatibility patches..."
 find "$TARGET_DIR" -type f \( -name "*.cpp" -o -name "*.h" \) ! -path "*/.git/*" | while read -r file; do
     sed -i 's/QEvent::DevicePixelRatioChange/QEvent::Type(999)/g' "$file" 2>/dev/null || true
 done
 
-find "$TARGET_DIR" -type f \( -name "PLSBasic.h" -o -name "PLSBasic.cpp" \) ! -path "*/.git/*" | while read -r file; do
-    sed -i '1s/^/#include <obs.h>\nstruct obs_source {};\n/' "$file" 2>/dev/null || true
-done
-
 echo "======================================================================"
-echo " Velora Customization Complete (Safe & Build-Ready)!"
+echo " Velora Customization & Build Prep Complete!"
 echo "======================================================================"
