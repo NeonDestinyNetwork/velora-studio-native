@@ -40,6 +40,7 @@ jobs:
         run: |
           echo "QT631=$QTDIR" >> $GITHUB_ENV
           echo "QTDIR=$QTDIR" >> $GITHUB_ENV
+          echo "QT_ROOT=$QTDIR" >> $GITHUB_ENV
 
       - name: Apply Velora Studio Branding, Colors & Ingest Presets
         shell: bash
@@ -50,6 +51,7 @@ jobs:
         shell: cmd
         working-directory: prism-src/build/windows
         run: |
+          echo QT631 is %QT631%
           configure.cmd
 
       - name: Build Velora Studio (Release)
@@ -57,11 +59,16 @@ jobs:
         run: |
           msbuild prism-live-studio.sln /p:Configuration=Release /p:Platform=x64 /m
 
-      - name: Package Velora Studio Installer
+      - name: Package Velora Studio Artifacts
         shell: bash
         run: |
           mkdir -p dist
-          cp -r prism-src/src/prism-live-studio/build/rundir/RelWithDebInfo/* dist/ || cp -r prism-src/src/prism-live-studio/build/rundir/Release/* dist/ || true
+          if [ -d "prism-src/bin/prism" ]; then
+            cp -r prism-src/bin/prism/* dist/ || true
+          fi
+          if [ -d "prism-src/src/prism-live-studio/build/rundir" ]; then
+            cp -r prism-src/src/prism-live-studio/build/rundir/* dist/ || true
+          fi
 
       - name: Upload Velora Studio Build Artifact
         uses: actions/upload-artifact@v4
