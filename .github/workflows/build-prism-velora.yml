@@ -62,11 +62,10 @@ jobs:
 
       - name: Build Velora Studio with MSBuild
         shell: cmd
+        working-directory: prism-src/src/prism-live-studio/build/Release
         run: |
-          for /R prism-src %%f in (*.sln) do (
-            echo Building Solution: %%f
-            msbuild "%%f" /p:Configuration=RelWithDebInfo /p:Platform=x64 /m /verbosity:minimal
-          )
+          echo Compiling Primary Velora Studio Solution...
+          msbuild prism-live-studio.sln /p:Configuration=RelWithDebInfo /p:Platform=x64 /m /verbosity:minimal
 
       - name: Package Velora Studio Artifacts
         shell: bash
