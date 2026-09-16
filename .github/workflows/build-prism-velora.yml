@@ -46,6 +46,7 @@ jobs:
           echo "QTDIR_RelWithDebInfo=$QTDIR" >> $GITHUB_ENV
           echo "QTDIR_Release=$QTDIR" >> $GITHUB_ENV
           echo "QTDIR_Debug=$QTDIR" >> $GITHUB_ENV
+          echo "$QTDIR/bin" >> $GITHUB_PATH
 
       - name: Apply Velora Studio Branding, Colors & Ingest Presets
         shell: bash
@@ -66,15 +67,34 @@ jobs:
           echo Compiling Primary Velora Studio Solution...
           msbuild prism-live-studio.sln /p:Configuration=RelWithDebInfo /p:Platform=x64 /p:TreatWarningsAsErrors=false /p:WarningLevel=3 /m /verbosity:minimal
 
-      - name: Package Velora Studio Artifacts
+      - name: Package Velora Studio Artifacts (with Full Qt Runtime & Dependencies)
         shell: bash
         run: |
           mkdir -p dist
-          echo "Packaging compiled Velora Studio binaries..."
-          if [ -d "prism-src/bin/prism" ]; then
+          echo "Packaging compiled binaries and output tree..."
+          if [ -d "prism-src/bin/prism/windows/Release" ]; then
+            cp -r prism-src/bin/prism/windows/Release/* dist/ 2>/dev/null || true
+          elif [ -d "prism-src/bin/prism" ]; then
             cp -r prism-src/bin/prism/* dist/ 2>/dev/null || true
           fi
-          find prism-src -type f \( -name "*.exe" -o -name "*.dll" \) ! -path "*/.git/*" -exec cp -t dist {} + 2>/dev/null || true
+          
+          # Find all build binaries (.exe, .dll)
+          find prism-src/src/prism-live-studio/build/Release -type f \( -name "*.exe" -o -name "*.dll" \) ! -path "*/.git/*" -exec cp -t dist {} + 2>/dev/null || true
+          
+          # Bundle all required Qt 6.5.3 runtime DLLs and plugins
+          echo "Bundling Qt runtime DLLs and platforms..."
+          cp -r "$QTDIR/bin/"*.dll dist/ 2>/dev/null || true
+          if [ -d "dist/bin/64bit" ]; then
+            cp -r "$QTDIR/bin/"*.dll dist/bin/64bit/ 2>/dev/null || true
+            cp -r "$QTDIR/plugins" dist/bin/64bit/ 2>/dev/null || true
+          fi
+          cp -r "$QTDIR/plugins" dist/ 2>/dev/null || true
+          
+          # Run windeployqt to guarantee all dependencies are packaged
+          find dist -name "*.exe" | while read -r exe; do
+            windeployqt --release --no-translations "$exe" 2>/dev/null || true
+          done
+          
           ls -la dist/ || true
 
       - name: Upload Velora Studio Build Artifact
