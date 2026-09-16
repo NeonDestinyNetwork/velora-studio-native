@@ -130,17 +130,7 @@ jobs:
           fi
           
           # 7. Create 1-Click Root Launcher script
-          cat << 'EOF' > "dist/Launch Velora Studio.bat"
-@echo off
-cd /d "%~dp0bin\64bit"
-if exist "VeloraStudio.exe" (
-    start "" "VeloraStudio.exe" %*
-) else if exist "PRISMLiveStudio.exe" (
-    start "" "PRISMLiveStudio.exe" %*
-) else if exist "obs64.exe" (
-    start "" "obs64.exe" %*
-)
-EOF
+          printf '@echo off\r\ncd /d "%%~dp0bin\\64bit"\r\nif exist "VeloraStudio.exe" (\r\n    start "" "VeloraStudio.exe" %%*\r\n) else if exist "PRISMLiveStudio.exe" (\r\n    start "" "PRISMLiveStudio.exe" %%*\r\n) else if exist "obs64.exe" (\r\n    start "" "obs64.exe" %%*\r\n)\r\n' > "dist/Launch Velora Studio.bat"
           
           # 8. Run windeployqt
           find dist -name "*.exe" | while read -r exe; do
