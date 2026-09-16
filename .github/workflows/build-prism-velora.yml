@@ -1,0 +1,70 @@
+name: Build Velora Studio (PRISM Base - Windows)
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  build-velora-studio:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout Velora Studio Customizations
+        uses: actions/checkout@v4
+        with:
+          path: velora-custom
+
+      - name: Checkout PRISM Live Studio Base
+        uses: actions/checkout@v4
+        with:
+          repository: naver/prism-live-studio
+          submodules: recursive
+          path: prism-src
+
+      - name: Setup MSBuild & Visual Studio 2022
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup Qt 6.3.1
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.3.1'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2019_64'
+          dir: '${{ runner.temp }}'
+
+      - name: Set Qt Environment Variables
+        shell: bash
+        run: |
+          echo "QT631=$QTDIR" >> $GITHUB_ENV
+          echo "QTDIR=$QTDIR" >> $GITHUB_ENV
+
+      - name: Apply Velora Studio Branding, Colors & Ingest Presets
+        shell: bash
+        run: |
+          bash velora-custom/scripts/rebrand-prism-to-velora.sh prism-src
+
+      - name: Configure CMake & Generate Solution
+        shell: cmd
+        working-directory: prism-src/build/windows
+        run: |
+          configure.cmd
+
+      - name: Build Velora Studio (Release)
+        working-directory: prism-src/src/prism-live-studio/build
+        run: |
+          msbuild prism-live-studio.sln /p:Configuration=Release /p:Platform=x64 /m
+
+      - name: Package Velora Studio Installer
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp -r prism-src/src/prism-live-studio/build/rundir/RelWithDebInfo/* dist/ || cp -r prism-src/src/prism-live-studio/build/rundir/Release/* dist/ || true
+
+      - name: Upload Velora Studio Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Velora-Studio-Windows-x64
+          path: dist/

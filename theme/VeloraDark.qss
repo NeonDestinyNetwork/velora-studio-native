@@ -1,0 +1,263 @@
+/* ==========================================================================
+   Velora Studio — Native Qt6 Broadcast Theme (VeloraDark.qss)
+   Brand Color Palette:
+     - Cosmic Midnight Base: #040817 -> #06173a -> #01030a
+     - Brand Rich Gold: #D4AF37
+     - Electric Live Accent: #FFD700
+     - Docks & Panels: #0a0f24 (Border: #1e2a4a)
+     - Card / Items: #131b38
+     - Typography: #f8f9fa (Muted: #8a99b5)
+   ========================================================================== */
+
+QMainWindow, QDialog, QWidget#centralWidget {
+    background-color: #040817;
+    color: #f8f9fa;
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-size: 13px;
+    selection-background-color: #D4AF37;
+    selection-color: #01030a;
+}
+
+QWidget {
+    outline: none;
+}
+
+/* --- Menu Bar --- */
+QMenuBar {
+    background-color: #01030a;
+    color: #f8f9fa;
+    padding: 2px 6px;
+    border-bottom: 1px solid #1e2a4a;
+}
+
+QMenuBar::item {
+    background: transparent;
+    padding: 6px 12px;
+    border-radius: 4px;
+}
+
+QMenuBar::item:selected {
+    background-color: #131b38;
+    color: #FFD700;
+}
+
+QMenu {
+    background-color: #0a0f24;
+    color: #f8f9fa;
+    border: 1px solid #1e2a4a;
+    border-radius: 6px;
+    padding: 4px;
+}
+
+QMenu::item {
+    padding: 6px 24px;
+    border-radius: 4px;
+}
+
+QMenu::item:selected {
+    background-color: #131b38;
+    color: #FFD700;
+}
+
+QMenu::separator {
+    height: 1px;
+    background-color: #1e2a4a;
+    margin: 4px 8px;
+}
+
+QStatusBar {
+    background-color: #01030a;
+    color: #8a99b5;
+    border-top: 1px solid #1e2a4a;
+    font-size: 12px;
+}
+
+/* --- Docks & Panels --- */
+QDockWidget {
+    background-color: #0a0f24;
+    color: #f8f9fa;
+    border: 1px solid #1e2a4a;
+    border-radius: 8px;
+}
+
+QDockWidget::title {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #06173a, stop:1 #0a0f24);
+    color: #D4AF37;
+    font-weight: 700;
+    padding: 7px 12px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom: 1px solid #1e2a4a;
+    letter-spacing: 0.5px;
+}
+
+/* --- Push Buttons --- */
+QPushButton {
+    background-color: #131b38;
+    color: #f8f9fa;
+    border: 1px solid #1e2a4a;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-weight: 500;
+}
+
+QPushButton:hover {
+    background-color: #1a254d;
+    border-color: #D4AF37;
+    color: #ffffff;
+}
+
+QPushButton:pressed {
+    background-color: #0f162e;
+}
+
+QPushButton:checked {
+    background-color: #D4AF37;
+    color: #01030a;
+    font-weight: 700;
+    border-color: #FFD700;
+}
+
+/* Start Streaming Master Action Button */
+QPushButton#streamButton {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #D4AF37, stop:1 #FFD700);
+    color: #01030a;
+    font-weight: 700;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 18px;
+    letter-spacing: 0.5px;
+}
+
+QPushButton#streamButton:hover {
+    background: #FFD700;
+}
+
+QPushButton#streamButton:checked {
+    background: #ff334b;
+    color: #ffffff;
+}
+
+/* Record Button */
+QPushButton#recordButton:checked {
+    background: #ff334b;
+    color: #ffffff;
+    border-color: #ff5e72;
+}
+
+/* --- Scenes & Sources Lists --- */
+QListWidget, QTreeWidget, QTableView {
+    background-color: #070c1e;
+    color: #f8f9fa;
+    border: 1px solid #1e2a4a;
+    border-radius: 6px;
+    padding: 4px;
+}
+
+QListWidget::item, QTreeWidget::item {
+    padding: 7px 10px;
+    border-radius: 5px;
+    margin: 1px 0px;
+}
+
+QListWidget::item:hover, QTreeWidget::item:hover {
+    background-color: #131b38;
+    color: #ffffff;
+}
+
+QListWidget::item:selected, QTreeWidget::item:selected {
+    background-color: #1a254d;
+    border-left: 3px solid #D4AF37;
+    color: #FFD700;
+    font-weight: 600;
+}
+
+/* --- Sliders & Mixer Faders --- */
+QSlider::groove:horizontal {
+    height: 6px;
+    background: #131b38;
+    border-radius: 3px;
+    border: 1px solid #1e2a4a;
+}
+
+QSlider::sub-page:horizontal {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #00e676, stop:0.7 #D4AF37, stop:1 #FFD700);
+    border-radius: 3px;
+}
+
+QSlider::handle:horizontal {
+    background: #f8f9fa;
+    border: 2px solid #D4AF37;
+    width: 14px;
+    margin-top: -5px;
+    margin-bottom: -5px;
+    border-radius: 7px;
+}
+
+QSlider::groove:vertical {
+    width: 6px;
+    background: #131b38;
+    border-radius: 3px;
+    border: 1px solid #1e2a4a;
+}
+
+QSlider::add-page:vertical {
+    background: qlineargradient(x1:0, y1:1, x2:0, y2:0, stop:0 #00e676, stop:0.7 #D4AF37, stop:1 #FFD700);
+    border-radius: 3px;
+}
+
+QSlider::handle:vertical {
+    background: #f8f9fa;
+    border: 2px solid #D4AF37;
+    height: 14px;
+    margin-left: -5px;
+    margin-right: -5px;
+    border-radius: 7px;
+}
+
+/* --- Native Volume Meter (VolMeter) --- */
+VolMeter {
+    qproperty-bkColor: #070c1e;
+    qproperty-magColor: #00e676;
+    qproperty-peakColor: #D4AF37;
+    qproperty-clipColor: #ff334b;
+}
+
+/* --- Tab Widget --- */
+QTabWidget::pane {
+    border: 1px solid #1e2a4a;
+    border-radius: 6px;
+    background-color: #0a0f24;
+}
+
+QTabBar::tab {
+    background-color: #070c1e;
+    color: #8a99b5;
+    padding: 7px 16px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+    background-color: #0a0f24;
+    color: #D4AF37;
+    border-top: 2px solid #D4AF37;
+    border-left: 1px solid #1e2a4a;
+    border-right: 1px solid #1e2a4a;
+    font-weight: 600;
+}
+
+/* --- Input Fields --- */
+QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
+    background-color: #070c1e;
+    color: #f8f9fa;
+    border: 1px solid #1e2a4a;
+    border-radius: 5px;
+    padding: 5px 8px;
+}
+
+QLineEdit:focus, QComboBox:focus {
+    border-color: #D4AF37;
+    background-color: #0a1129;
+}

@@ -1,0 +1,50 @@
+{
+  "format_version": 2,
+  "services": [
+    {
+      "name": "Velora Network (WHIP / WebRTC)",
+      "protocol": "whip",
+      "servers": [
+        {
+          "name": "Velora Live Edge (Auto)",
+          "url": "https://publish.velora.tv/live/{key}?direction=whip"
+        }
+      ],
+      "recommended": {
+        "keyint": 2,
+        "bframes": 0,
+        "profile": "main",
+        "video_codec": "h264",
+        "audio_codec": "opus",
+        "audio_sample_rate": 48000,
+        "max_video_bitrate": 8000,
+        "max_audio_bitrate": 320
+      }
+    },
+    {
+      "name": "Velora Network (RTMP)",
+      "protocol": "rtmp",
+      "servers": [
+        {
+          "name": "US East (New York)",
+          "url": "rtmp://nyc.ingest.velora.tv/live"
+        },
+        {
+          "name": "US East (Ashburn)",
+          "url": "rtmp://iad.ingest.velora.tv/live"
+        },
+        {
+          "name": "Auto Nearest Ingest",
+          "url": "rtmp://ingest.velora.tv/live"
+        }
+      ],
+      "recommended": {
+        "keyint": 2,
+        "bframes": 2,
+        "profile": "high",
+        "max_video_bitrate": 8000,
+        "max_audio_bitrate": 320
+      }
+    }
+  ]
+}

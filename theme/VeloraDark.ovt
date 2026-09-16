@@ -1,0 +1,10 @@
+OBSTheme {
+    window-style: true;
+    dark: true;
+}
+
+@OBSThemeMeta {
+    name: 'VeloraDark';
+    author: 'Velora Network';
+    dark: 'true';
+}
