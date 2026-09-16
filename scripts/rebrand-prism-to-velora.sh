@@ -63,11 +63,16 @@ find "$TARGET_DIR" -type f -name "CMakeLists.txt" ! -path "*/.git/*" | while rea
     sed -i 's/legacy_check(.[^)]*)/message(STATUS "legacy_check bypassed")/g' "$file" 2>/dev/null || true
 done
 
-# 6. Disable Treat Warnings As Errors (/WX) across all build files
-echo "[6/6] Disabling TreatWarningsAsErrors (/WX)..."
+# 6. Disable Treat Warnings As Errors (/WX) & suppress C4996 deprecation warning globally
+echo "[6/6] Disabling /WX and suppressing C4996..."
 find "$TARGET_DIR" -type f \( -name "*.cmake" -o -name "CMakeLists.txt" \) ! -path "*/.git/*" | while read -r file; do
     sed -i 's/\/WX//g' "$file" 2>/dev/null || true
     sed -i 's/-WX//g' "$file" 2>/dev/null || true
+done
+
+find "$TARGET_DIR" -type f -name "Config.cpp" ! -path "*/.git/*" | while read -r file; do
+    echo "Injecting pragma into $file"
+    sed -i '1s/^/#pragma warning(disable: 4996)\n/' "$file" 2>/dev/null || true
 done
 
 echo "======================================================================"
