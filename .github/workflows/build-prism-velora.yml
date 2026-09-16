@@ -27,7 +27,7 @@ jobs:
       - name: Setup MSBuild & Visual Studio 2022
         uses: microsoft/setup-msbuild@v2
 
-      - name: Setup Qt 6.3.1 (Multimedia, WebSockets, NetworkAuth & Compat)
+      - name: Setup Qt 6.3.1 (Full Desktop Module Suite)
         uses: jurplel/install-qt-action@v3
         with:
           version: '6.3.1'
@@ -35,7 +35,7 @@ jobs:
           target: 'desktop'
           arch: 'win64_msvc2019_64'
           dir: '${{ runner.temp }}'
-          modules: 'qtmultimedia qtwebsockets qtnetworkauth qt5compat'
+          modules: 'qtmultimedia qtnetworkauth qtwebsockets qt5compat qtimageformats qtshadertools'
 
       - name: Set Qt Environment Variables
         shell: bash
@@ -61,12 +61,12 @@ jobs:
           configure.cmd
 
       - name: Build Velora Studio with MSBuild
-        shell: bash
+        shell: cmd
         run: |
-          echo "Locating Visual Studio Solution..."
-          SLN_PATH=$(find prism-src -name "*.sln" | head -n 1)
-          echo "Building Solution: $SLN_PATH"
-          msbuild "$SLN_PATH" /p:Configuration=RelWithDebInfo /p:Platform=x64 /m /verbosity:minimal
+          for /R prism-src %%f in (*.sln) do (
+            echo Building Solution: %%f
+            msbuild "%%f" /p:Configuration=RelWithDebInfo /p:Platform=x64 /m /verbosity:minimal
+          )
 
       - name: Package Velora Studio Artifacts
         shell: bash
