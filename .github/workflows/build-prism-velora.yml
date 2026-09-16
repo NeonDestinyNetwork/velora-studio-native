@@ -73,14 +73,22 @@ jobs:
       - name: Package Complete Velora Studio Distribution (Full FFmpeg, OBS-Deps & Qt Suite)
         shell: bash
         run: |
-          mkdir -p dist/bin/64bit dist/data dist/obs-plugins/64bit
+          mkdir -p dist/bin/64bit dist/data dist/obs-plugins/64bit dist/prism-plugins/64bit
           
-          # 1. Copy official PRISM & OBS output trees (RelWithDebInfo, Release, rundir)
-          echo "Copying PRISM & OBS output trees..."
-          for outdir in prism-src/bin/prism/windows/RelWithDebInfo prism-src/bin/prism/windows/Release prism-src/src/obs-studio/build/Release/rundir/RelWithDebInfo prism-src/src/obs-studio/build/Release/rundir/Release; do
+          # 1. Copy official PRISM runtime output tree first
+          echo "Copying PRISM runtime tree..."
+          for outdir in prism-src/bin/prism/windows/Release prism-src/bin/prism/windows/RelWithDebInfo prism-src/bin/prism; do
             if [ -d "$outdir" ]; then
-              echo "Copying tree from $outdir to dist..."
+              echo "Copying PRISM tree from $outdir to dist..."
               cp -r "$outdir"/* dist/ 2>/dev/null || true
+            fi
+          done
+          
+          # Copy OBS base rundir for any missing backend libraries (without overwriting PRISM binaries)
+          for outdir in prism-src/src/obs-studio/build/Release/rundir/RelWithDebInfo prism-src/src/obs-studio/build/Release/rundir/Release; do
+            if [ -d "$outdir" ]; then
+              echo "Copying OBS libraries from $outdir..."
+              cp -r -n "$outdir"/* dist/ 2>/dev/null || cp -r "$outdir"/* dist/ 2>/dev/null || true
             fi
           done
           
@@ -103,13 +111,18 @@ jobs:
           
           # 3. Copy internal common-libs and OBS DLLs into bin/64bit
           echo "Bundling compiled core DLLs..."
-          find prism-src/src/prism-live-studio/build -name "*.dll" ! -path "*/obs-plugins/*" -exec cp {} dist/bin/64bit/ \; 2>/dev/null || true
+          find prism-src/src/prism-live-studio/build -name "*.dll" ! -path "*/obs-plugins/*" ! -path "*/prism-plugins/*" -exec cp {} dist/bin/64bit/ \; 2>/dev/null || true
           find prism-src/src/obs-studio/build -name "*.dll" ! -path "*/obs-plugins/*" -exec cp {} dist/bin/64bit/ \; 2>/dev/null || true
 
-          # 4. Copy OBS plugins into obs-plugins/64bit
-          echo "Bundling OBS plugins..."
+          # 4. Copy OBS plugins and PRISM plugins
+          echo "Bundling OBS & PRISM plugins..."
           find prism-src -type d -path "*/obs-plugins/64bit" | while read -r pdir; do
             cp -r "$pdir"/* dist/obs-plugins/64bit/ 2>/dev/null || true
+          done
+          find prism-src -type d -path "*/prism-plugins/64bit" | while read -r pdir; do
+            mkdir -p dist/prism-plugins/64bit dist/bin/64bit/prism-plugins/64bit
+            cp -r "$pdir"/* dist/prism-plugins/64bit/ 2>/dev/null || true
+            cp -r "$pdir"/* dist/bin/64bit/prism-plugins/64bit/ 2>/dev/null || true
           done
 
           # 5. Copy all Data and Resource folders (themes, services, shaders, locales)
@@ -125,6 +138,19 @@ jobs:
             mkdir -p dist/data/prism
             cp -r "$d"/* dist/data/prism/ 2>/dev/null || true
           done
+
+          # Inject Velora services and themes into all data destinations
+          mkdir -p dist/data/obs-plugins/rtmp-services dist/data/obs-plugins/obs-outputs dist/bin/64bit/data/obs-plugins/rtmp-services dist/bin/64bit/data/obs-plugins/obs-outputs
+          cp velora-custom/config/services.json dist/data/obs-plugins/rtmp-services/services.json
+          cp velora-custom/config/services.json dist/data/obs-plugins/obs-outputs/services.json
+          cp velora-custom/config/services.json dist/bin/64bit/data/obs-plugins/rtmp-services/services.json
+          cp velora-custom/config/services.json dist/bin/64bit/data/obs-plugins/obs-outputs/services.json
+
+          mkdir -p dist/data/obs-studio/themes dist/bin/64bit/data/obs-studio/themes dist/data/prism/themes dist/bin/64bit/data/prism/themes
+          cp velora-custom/theme/* dist/data/obs-studio/themes/ 2>/dev/null || true
+          cp velora-custom/theme/* dist/bin/64bit/data/obs-studio/themes/ 2>/dev/null || true
+          cp velora-custom/theme/* dist/data/prism/themes/ 2>/dev/null || true
+          cp velora-custom/theme/* dist/bin/64bit/data/prism/themes/ 2>/dev/null || true
 
           # Mirror data and plugins to bin/64bit so relative lookups always resolve
           mkdir -p dist/bin/64bit/data dist/bin/64bit/obs-plugins
@@ -144,18 +170,26 @@ jobs:
           cp -r "$QT_PLUGINS/networkinformation" dist/bin/64bit/ 2>/dev/null || true
           cp -r "$QT_PLUGINS/multimedia" dist/bin/64bit/ 2>/dev/null || true
 
-          # 7. Ensure VeloraStudio.exe exists in bin/64bit
-          if [ -f "dist/bin/64bit/PRISMLiveStudio.exe" ]; then
-            cp "dist/bin/64bit/PRISMLiveStudio.exe" "dist/bin/64bit/VeloraStudio.exe"
-          elif [ -f "dist/bin/64bit/obs64.exe" ]; then
-            cp "dist/bin/64bit/obs64.exe" "dist/bin/64bit/VeloraStudio.exe"
+          # 7. Ensure genuine PRISM Live Studio UI binary is used as VeloraStudio.exe
+          echo "Locating genuine PRISM Live Studio UI binary..."
+          PRISM_BIN=""
+          if [ -f "prism-src/src/prism-live-studio/build/Release/prism-live-studio/PRISMLiveStudio/RelWithDebInfo/obs64.exe" ]; then
+            PRISM_BIN="prism-src/src/prism-live-studio/build/Release/prism-live-studio/PRISMLiveStudio/RelWithDebInfo/obs64.exe"
+          elif [ -f "prism-src/bin/prism/windows/Release/bin/64bit/PRISMLiveStudio.exe" ]; then
+            PRISM_BIN="prism-src/bin/prism/windows/Release/bin/64bit/PRISMLiveStudio.exe"
+          fi
+
+          if [ -n "$PRISM_BIN" ]; then
+            echo "Installing PRISM UI binary from: $PRISM_BIN"
+            cp "$PRISM_BIN" dist/bin/64bit/VeloraStudio.exe
+            cp "$PRISM_BIN" dist/bin/64bit/PRISMLiveStudio.exe
           fi
 
           # 8. Run windeployqt to guarantee all dependencies
           "$QT_BIN/windeployqt.exe" --release --no-translations dist/bin/64bit/VeloraStudio.exe --dir dist/bin/64bit 2>/dev/null || true
 
           # 9. Create 1-Click Root Launcher batch script
-          printf '@echo off\r\ncd /d "%%~dp0bin\\64bit"\r\nif exist "VeloraStudio.exe" (\r\n    start "" "VeloraStudio.exe" %%*\r\n) else if exist "PRISMLiveStudio.exe" (\r\n    start "" "PRISMLiveStudio.exe" %%*\r\n) else if exist "obs64.exe" (\r\n    start "" "obs64.exe" %%*\r\n)\r\n' > "dist/Launch Velora Studio.bat"
+          printf '@echo off\r\ncd /d "%%~dp0bin\\64bit"\r\nif exist "VeloraStudio.exe" (\r\n    start "" "VeloraStudio.exe" %%*\r\n) else if exist "PRISMLiveStudio.exe" (\r\n    start "" "PRISMLiveStudio.exe" %%*\r\n)\r\n' > "dist/Launch Velora Studio.bat"
 
       - name: Compile Native C++ Root Launcher (VeloraStudio.exe)
         shell: cmd

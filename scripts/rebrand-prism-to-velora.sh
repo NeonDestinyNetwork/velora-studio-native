@@ -32,7 +32,7 @@ mkdir -p "$TARGET_DIR/bin/prism/windows/RelWithDebInfo"
 
 # 2. Inject Velora Services (WHIP + RTMP)
 echo "[2/8] Injecting Velora Service Definitions..."
-find "$TARGET_DIR" -type d -path "*/plugins/obs-outputs/data" | while read -r dest; do
+find "$TARGET_DIR" -type d \( -path "*/plugins/obs-outputs/data" -o -path "*/plugins/rtmp-services/data" -o -path "*/data/obs-plugins/rtmp-services" -o -path "*/data/obs-plugins/obs-outputs" \) | while read -r dest; do
     echo "Copying services.json to $dest"
     cp "$ROOT_DIR/config/services.json" "$dest/"
 done

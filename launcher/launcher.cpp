@@ -18,10 +18,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     DWORD attribs = GetFileAttributesW(targetExe.c_str());
     if (attribs == INVALID_FILE_ATTRIBUTES) {
         targetExe = workDir + L"\\PRISMLiveStudio.exe";
-        attribs = GetFileAttributesW(targetExe.c_str());
-        if (attribs == INVALID_FILE_ATTRIBUTES) {
-            targetExe = workDir + L"\\obs64.exe";
-        }
     }
 
     STARTUPINFOW si;
