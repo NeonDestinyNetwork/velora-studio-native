@@ -88,6 +88,14 @@ find "$TARGET_DIR" -type f \( -name "*.cpp" -o -name "*.h" \) ! -path "*/.git/*"
     sed -i 's/QEvent::DevicePixelRatioChange/QEvent::Type(999)/g' "$file" 2>/dev/null || true
 done
 
+# 9. Rebrand Windows .rc resource metadata (Product Name, File Description)
+echo "[9/9] Rebranding Windows Resource metadata to Velora Studio..."
+find "$TARGET_DIR" -type f -name "*.rc" ! -path "*/.git/*" | while read -r file; do
+    sed -i 's/PRISM Live Studio/Velora Studio/g' "$file" 2>/dev/null || true
+    sed -i 's/PRISMLiveStudio/VeloraStudio/g' "$file" 2>/dev/null || true
+    sed -i 's/NAVER Corp\./Velora/g' "$file" 2>/dev/null || true
+done
+
 echo "======================================================================"
 echo " Velora Customization & Build Prep Complete!"
 echo "======================================================================"
