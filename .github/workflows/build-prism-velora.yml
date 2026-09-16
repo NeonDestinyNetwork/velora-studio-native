@@ -24,8 +24,10 @@ jobs:
           path: prism-src
           fetch-depth: 0
 
-      - name: Setup MSBuild & Visual Studio 2022
-        uses: microsoft/setup-msbuild@v2
+      - name: Setup Visual Studio MSVC Developer Environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
       - name: Setup Qt 6.5.3 (LTS Full Module Suite)
         uses: jurplel/install-qt-action@v3
@@ -162,9 +164,23 @@ jobs:
           cl /nologo /O2 /EHsc /Fe:dist\VeloraStudio.exe velora-custom\launcher\launcher.cpp /link /SUBSYSTEM:WINDOWS user32.lib shell32.lib
           if exist "dist\launcher.obj" del "dist\launcher.obj"
 
-      - name: Upload Velora Studio Build Artifact
+      - name: Build Official Windows Setup Installer (.exe)
+        shell: cmd
+        run: |
+          echo Building NSIS Setup Installer...
+          mkdir dist-installer
+          makensis velora-custom\installer\velora-installer.nsi
+
+      - name: Upload Velora Studio Portable Package
         uses: actions/upload-artifact@v4
         with:
-          name: Velora-Studio-Windows-x64
+          name: Velora-Studio-Windows-x64-Portable
           path: dist/
+          if-no-files-found: warn
+
+      - name: Upload Velora Studio Official Setup Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Velora-Studio-Windows-Installer
+          path: dist-installer/
           if-no-files-found: warn
