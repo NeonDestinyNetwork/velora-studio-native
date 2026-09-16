@@ -168,8 +168,8 @@ jobs:
         shell: cmd
         run: |
           echo Building NSIS Setup Installer...
-          mkdir dist-installer
-          makensis velora-custom\installer\velora-installer.nsi
+          if not exist "dist-installer" mkdir dist-installer
+          makensis /DSOURCEDIR="%CD%\dist" /DOUTDIR="%CD%\dist-installer" velora-custom\installer\velora-installer.nsi
 
       - name: Upload Velora Studio Portable Package
         uses: actions/upload-artifact@v4

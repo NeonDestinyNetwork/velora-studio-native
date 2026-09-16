@@ -5,6 +5,13 @@
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
 
+!ifndef SOURCEDIR
+  !define SOURCEDIR "..\..\dist"
+!endif
+!ifndef OUTDIR
+  !define OUTDIR "..\..\dist-installer"
+!endif
+
 SetCompressor /SOLID lzma
 
 !include "MUI2.nsh"
@@ -29,7 +36,7 @@ SetCompressor /SOLID lzma
 !insertmacro MUI_LANGUAGE "English"
 
 Name "${PRODUCT_NAME}"
-OutFile "dist-installer\Velora-Studio-Setup-x64.exe"
+OutFile "${OUTDIR}\Velora-Studio-Setup-x64.exe"
 InstallDir "$PROGRAMFILES64\Velora Studio"
 InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
 ShowInstDetails show
@@ -38,7 +45,7 @@ ShowUnInstDetails show
 Section "MainSection" SEC01
   SetOutPath "$INSTDIR"
   SetOverwrite ifnewer
-  File /r "dist\*.*"
+  File /r "${SOURCEDIR}\*.*"
 
   ; Shortcuts
   SetOutPath "$INSTDIR\bin\64bit"
