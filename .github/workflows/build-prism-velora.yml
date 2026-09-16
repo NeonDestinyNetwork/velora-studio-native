@@ -27,7 +27,7 @@ jobs:
       - name: Setup MSBuild & Visual Studio 2022
         uses: microsoft/setup-msbuild@v2
 
-      - name: Setup Qt 6.3.1 (Multimedia, WebSockets & Compat)
+      - name: Setup Qt 6.3.1 (Multimedia, WebSockets, NetworkAuth & Compat)
         uses: jurplel/install-qt-action@v3
         with:
           version: '6.3.1'
@@ -35,7 +35,7 @@ jobs:
           target: 'desktop'
           arch: 'win64_msvc2019_64'
           dir: '${{ runner.temp }}'
-          modules: 'qtmultimedia qtwebsockets qt5compat'
+          modules: 'qtmultimedia qtwebsockets qtnetworkauth qt5compat'
 
       - name: Set Qt Environment Variables
         shell: bash
