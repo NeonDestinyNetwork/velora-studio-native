@@ -82,9 +82,22 @@ jobs:
             fi
           done
           
-          # 2. Copy ALL third-party dependencies from obs-deps (FFmpeg, libcurl, pthreads, srt, etc.)
-          echo "Bundling obs-deps..."
+          # 2. Copy ALL third-party dependencies from obs-deps & CEF (FFmpeg, libcurl, pthreads, srt, CEF pak/dat)
+          echo "Bundling obs-deps and CEF assets..."
           find prism-src -path "*/.deps/*" -name "*.dll" -exec cp {} dist/bin/64bit/ \; 2>/dev/null || true
+          find prism-src -path "*/cef_binary*/*" \( -name "*.pak" -o -name "*.dat" -o -name "*.bin" -o -name "*.dll" \) -exec cp {} dist/bin/64bit/ \; 2>/dev/null || true
+          find prism-src -type d -path "*/cef_binary*/Resources/locales" | while read -r ldir; do
+            mkdir -p dist/bin/64bit/locales
+            cp -r "$ldir"/* dist/bin/64bit/locales/ 2>/dev/null || true
+          done
+          find prism-src -type d -path "*/cef_binary*/locales" | while read -r ldir; do
+            mkdir -p dist/bin/64bit/locales
+            cp -r "$ldir"/* dist/bin/64bit/locales/ 2>/dev/null || true
+          done
+          
+          # Enable portable mode to keep configs localized
+          touch dist/bin/64bit/obs_portable_mode
+          touch dist/obs_portable_mode
           
           # 3. Copy internal common-libs and OBS DLLs into bin/64bit
           echo "Bundling compiled core DLLs..."
