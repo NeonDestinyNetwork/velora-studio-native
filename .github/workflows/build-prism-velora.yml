@@ -60,24 +60,23 @@ jobs:
           echo QTDIR is %QTDIR%
           configure.cmd
 
-      - name: Build Velora Studio (RelWithDebInfo)
-        working-directory: prism-src/src/prism-live-studio/build
-        shell: cmd
+      - name: Build Velora Studio with MSBuild
+        shell: bash
         run: |
-          msbuild prism-live-studio.sln /p:Configuration=RelWithDebInfo /p:Platform=x64 /m /verbosity:minimal
+          echo "Locating Visual Studio Solution..."
+          SLN_PATH=$(find prism-src -name "*.sln" | head -n 1)
+          echo "Building Solution: $SLN_PATH"
+          msbuild "$SLN_PATH" /p:Configuration=RelWithDebInfo /p:Platform=x64 /m /verbosity:minimal
 
       - name: Package Velora Studio Artifacts
         shell: bash
         run: |
           mkdir -p dist
-          echo "Searching and packaging compiled Velora Studio binaries..."
+          echo "Packaging compiled Velora Studio binaries..."
+          if [ -d "prism-src/bin/prism" ]; then
+            cp -r prism-src/bin/prism/* dist/ 2>/dev/null || true
+          fi
           find prism-src -type f \( -name "*.exe" -o -name "*.dll" \) ! -path "*/.git/*" -exec cp -t dist {} + 2>/dev/null || true
-          if [ -d "prism-src/bin" ]; then
-            cp -r prism-src/bin/* dist/ 2>/dev/null || true
-          fi
-          if [ -d "prism-src/src/prism-live-studio/build/rundir" ]; then
-            cp -r prism-src/src/prism-live-studio/build/rundir/* dist/ 2>/dev/null || true
-          fi
           ls -la dist/ || true
 
       - name: Upload Velora Studio Build Artifact
