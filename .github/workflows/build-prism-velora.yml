@@ -27,10 +27,10 @@ jobs:
       - name: Setup MSBuild & Visual Studio 2022
         uses: microsoft/setup-msbuild@v2
 
-      - name: Setup Qt 6.3.1 (Full Desktop Module Suite)
+      - name: Setup Qt 6.5.3 (LTS Full Module Suite)
         uses: jurplel/install-qt-action@v3
         with:
-          version: '6.3.1'
+          version: '6.5.3'
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2019_64'
@@ -56,7 +56,6 @@ jobs:
         shell: cmd
         working-directory: prism-src/build/windows
         run: |
-          echo QT631 is %QT631%
           echo QTDIR is %QTDIR%
           configure.cmd
 

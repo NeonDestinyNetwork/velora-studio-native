@@ -71,14 +71,17 @@ find "$TARGET_DIR" -type f \( -name "*.cmake" -o -name "CMakeLists.txt" \) ! -pa
 done
 
 find "$TARGET_DIR" -type f -name "Config.cpp" ! -path "*/.git/*" | while read -r file; do
-    echo "Injecting pragma into $file"
     sed -i '1s/^/#pragma warning(disable: 4996)\n/' "$file" 2>/dev/null || true
 done
 
-# 7. Fix Qt6 compatibility: QEvent::DevicePixelRatioChange
-echo "[7/7] Patching Qt6 QEvent::DevicePixelRatioChange..."
+# 7. Patch Qt6 Compatibility (obs_source declaration and DPI change event)
+echo "[7/7] Patching Qt6 Compatibility fixes..."
 find "$TARGET_DIR" -type f \( -name "*.cpp" -o -name "*.h" \) ! -path "*/.git/*" | while read -r file; do
     sed -i 's/QEvent::DevicePixelRatioChange/QEvent::Type(999)/g' "$file" 2>/dev/null || true
+done
+
+find "$TARGET_DIR" -type f \( -name "PLSBasic.h" -o -name "PLSBasic.cpp" \) ! -path "*/.git/*" | while read -r file; do
+    sed -i '1s/^/#include <obs.h>\nstruct obs_source {};\n/' "$file" 2>/dev/null || true
 done
 
 echo "======================================================================"
