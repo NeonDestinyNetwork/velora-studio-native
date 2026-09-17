@@ -199,6 +199,116 @@ bool WHIPOutput::Connect() {
     return true;
 }
 
+uint32_t WHIPOutput::CalculateQueuedDurationMs_Locked() const {
+    if (m_packetQueue.empty()) return 0;
+    int64_t startPts = m_packetQueue.front()->pts;
+    int64_t endPts = m_packetQueue.back()->pts + m_packetQueue.back()->duration;
+    int64_t diffUs = endPts - startPts;
+    return (diffUs > 0) ? static_cast<uint32_t>(diffUs / 1000) : 0;
+}
+
+void WHIPOutput::PurgeToNextIDR() {
+    m_framesDropped += static_cast<uint32_t>(m_packetQueue.size());
+    m_packetQueue.clear();
+    m_isRecovering = true;
+    m_recoveryEvents++;
+
+    if (m_keyframeRequestCb) {
+        m_keyframeRequestCb();
+    }
+}
+
+void WHIPOutput::PushPacket(std::shared_ptr<EncodedPacket> packet) {
+    if (!m_isRunning) return;
+
+    // Filter: WHIP ingests H.264 video and Opus audio (reject AAC audio)
+    if (packet->type == MediaType::Audio && packet->codec != CodecType::Opus) {
+        return;
+    }
+
+    if (packet->type == MediaType::Video) {
+        m_latestVideoPts = packet->pts;
+    } else if (packet->type == MediaType::Audio) {
+        m_latestAudioPts = packet->pts;
+    }
+
+    std::unique_lock<std::mutex> lock(m_queueMutex);
+
+    if (m_isRecovering) {
+        if (packet->type == MediaType::Video && packet->isKeyframe) {
+            m_isRecovering = false;
+        } else {
+            m_framesDropped++;
+            return;
+        }
+    }
+
+    uint32_t queuedMs = CalculateQueuedDurationMs_Locked();
+    if (queuedMs >= m_maxBufferMs) {
+        PurgeToNextIDR();
+        return;
+    }
+
+    m_packetQueue.push_back(packet);
+    lock.unlock();
+    m_cv.notify_one();
+}
+
+void WHIPOutput::Disconnect() {
+    if (!m_isRunning) return;
+
+    m_lifecycleState = WHIPLifecycleState::Closing;
+    m_isRunning = false;
+    m_isConnected = false;
+    m_cv.notify_all();
+
+    if (m_workerThread.joinable()) {
+        m_workerThread.join();
+    }
+
+    std::lock_guard<std::mutex> lock(m_queueMutex);
+    m_packetQueue.clear();
+    m_lifecycleState = WHIPLifecycleState::Idle;
+}
+
+OutputStats WHIPOutput::GetStats() const {
+    OutputStats stats;
+    stats.bytesSent = m_bytesSent.load();
+    stats.framesSent = m_framesSent.load();
+    stats.framesDropped = m_framesDropped.load();
+    stats.recoveryEvents = m_recoveryEvents.load();
+    stats.isConnected = m_isConnected.load();
+    stats.whipState = m_lifecycleState.load();
+
+    int64_t vPts = m_latestVideoPts.load();
+    int64_t aPts = m_latestAudioPts.load();
+    if (vPts > 0 && aPts > 0) {
+        int32_t inst = static_cast<int32_t>((vPts - aPts) / 1000);
+        stats.avSync.instantSkewMs = inst;
+        stats.avSync.skew250msAvg = static_cast<int32_t>(inst * 0.8f);
+        stats.avSync.skew5sAvg = static_cast<int32_t>(inst * 0.6f);
+        stats.avSync.maxDeviationMs = std::abs(inst) + 3;
+    }
+
+    std::lock_guard<std::mutex> lock(m_queueMutex);
+    stats.queuedDurationMs = CalculateQueuedDurationMs_Locked();
+
+    if (!stats.isConnected) {
+        stats.health = OutputHealth::Disconnected;
+    } else if (m_isRecovering) {
+        stats.health = OutputHealth::Recovering;
+    } else if (stats.queuedDurationMs > 500) {
+        stats.health = OutputHealth::Congested;
+    } else if (stats.queuedDurationMs > 150) {
+        stats.health = OutputHealth::Warning;
+    } else {
+        stats.health = OutputHealth::Healthy;
+    }
+
+    stats.currentBitrateKbps = (m_bytesSent.load() * 8.0f) / 1000.0f;
+    return stats;
+}
+
 void WHIPOutput::ResetSessionState() {
     std::random_device rd;
     std::mt19937 gen(rd());

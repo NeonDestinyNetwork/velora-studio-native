@@ -1,12 +1,22 @@
 #pragma once
 
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <d3d11.h>
+#else
+// Linux cross-platform forward declarations
+struct ID3D11Device;
+struct ID3D11Texture2D;
+#endif
+
 #include <string>
 #include <vector>
 #include <memory>
 #include <cstdint>
+#include <chrono>
+#include <mutex>
+#include <atomic>
 
 enum class MediaType {
     Video,
@@ -77,9 +87,14 @@ struct EncodedPacket {
     CodecType codec = CodecType::H264;
 };
 
-#include <chrono>
-#include <mutex>
-#include <atomic>
+struct GopTelemetry {
+    float configuredGopSec = 2.0f;
+    float observedGopSec = 2.0f;
+    uint32_t bFrames = 0;
+    uint32_t totalKeyframes = 0;
+    uint32_t forcedRecoveryKeyframes = 0;
+    bool isCompliant = true;
+};
 
 class HardwareEncoder {
 public:
@@ -90,6 +105,7 @@ public:
     bool EncodeFrame(ID3D11Texture2D* texture, int64_t timestampUs, std::vector<EncodedPacket>& outPackets);
     void RequestKeyframe();
     void Flush();
+    GopTelemetry GetGopTelemetry() const;
 
 private:
     ID3D11Device* m_device = nullptr;
@@ -99,4 +115,10 @@ private:
     std::atomic<bool> m_forceKeyframe{ false };
     std::chrono::steady_clock::time_point m_lastKeyframeRequestTime;
     mutable std::mutex m_keyframeMutex;
+
+    // Measured GOP Telemetry Tracking
+    int64_t m_lastKeyframePtsUs = 0;
+    float m_observedGopSec = 2.0f;
+    uint32_t m_totalKeyframes = 0;
+    uint32_t m_forcedRecoveryKeyframes = 0;
 };

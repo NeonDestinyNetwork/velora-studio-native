@@ -1,14 +1,45 @@
-name: Build Velora Studio Native (Clean x64 Windows Suite)
+name: Build Velora Studio Native (Windows & Linux Cross-Platform)
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, feature/* ]
     tags: [ 'v*' ]
   workflow_dispatch:
 
 jobs:
-  build-native-suite:
+  build-linux-suite:
+    runs-on: ubuntu-24.04
+    name: Build Linux Native Broadcast Suite
+
+    steps:
+      - name: Checkout Velora Studio Source
+        uses: actions/checkout@v4
+
+      - name: Install Build Essentials
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
+
+      - name: Compile Linux Native Engine
+        run: |
+          mkdir -p build-linux dist-linux
+          g++ -std=c++20 -O2 -I src/native src/native/main.cpp src/native/HardwareEncoder.cpp src/native/OutputRouter.cpp -lpthread -o dist-linux/VeloraStudioEngine
+          cp -r src/styles src/core src/index.html dist-linux/
+
+      - name: Test Native Linux Broadcast Engine
+        run: |
+          ./dist-linux/VeloraStudioEngine
+
+      - name: Upload Linux Broadcast Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Velora-Studio-Linux-x64
+          path: dist-linux/
+          if-no-files-found: warn
+
+  build-windows-suite:
     runs-on: windows-2022
+    name: Build Windows Native Broadcast Suite
 
     steps:
       - name: Checkout Velora Studio Source
@@ -19,42 +50,21 @@ jobs:
         with:
           arch: x64
 
-      - name: Package Velora Studio Native Distribution
+      - name: Package Velora Studio Distribution
         shell: bash
         run: |
-          mkdir -p dist/bin/64bit dist/data/themes dist/data/config dist-installer
-          
-          # Copy source assets into distribution package
+          mkdir -p dist/bin dist-installer
           cp -r src/* dist/
-          cp -r config/* dist/data/config/ 2>/dev/null || true
-          cp -r theme/* dist/data/themes/ 2>/dev/null || true
-          
-          # Create batch launcher
-          printf '@echo off\r\nstart "" "%%~dp0index.html"\r\n' > "dist/Launch Velora Studio.bat"
 
-      - name: Compile Native Win32 Launcher (VeloraStudio.exe)
+      - name: Compile Native Engine (VeloraStudioEngine.exe)
         shell: cmd
         run: |
-          echo Compiling Native C++ Launcher...
-          cl /nologo /O2 /EHsc /Fe:dist\VeloraStudio.exe launcher\launcher.cpp /link /SUBSYSTEM:WINDOWS user32.lib shell32.lib
-          if exist "dist\launcher.obj" del "dist\launcher.obj"
+          echo Compiling Native Windows Broadcast Engine...
+          cl /nologo /std:c++20 /O2 /EHsc /Fe:dist\VeloraStudioEngine.exe src\native\main.cpp src\native\D3D11Renderer.cpp src\native\CaptureEngine.cpp src\native\AudioMixer.cpp src\native\HardwareEncoder.cpp src\native\OutputRouter.cpp /link /SUBSYSTEM:WINDOWS d3d11.lib dxgi.lib d3dcompiler.lib ole32.lib user32.lib shell32.lib
 
-      - name: Build Official Windows Setup Installer (.exe)
-        shell: cmd
-        run: |
-          echo Compiling NSIS Windows Setup Installer...
-          makensis /DSOURCEDIR="%CD%\dist" /DOUTDIR="%CD%\dist-installer" installer\velora-installer.nsi
-
-      - name: Upload Velora Studio Portable Package
+      - name: Upload Velora Studio Windows Package
         uses: actions/upload-artifact@v4
         with:
-          name: Velora-Studio-Windows-x64-Portable
+          name: Velora-Studio-Windows-x64
           path: dist/
-          if-no-files-found: warn
-
-      - name: Upload Velora Studio Official Setup Installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: Velora-Studio-Windows-Installer
-          path: dist-installer/
           if-no-files-found: warn

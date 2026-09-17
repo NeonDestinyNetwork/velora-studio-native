@@ -28,11 +28,25 @@ void HardwareEncoder::RequestKeyframe() {
 }
 
 bool HardwareEncoder::EncodeFrame(ID3D11Texture2D* texture, int64_t timestampUs, std::vector<EncodedPacket>& outPackets) {
-    if (!m_isInitialized || !texture) return false;
+    if (!m_isInitialized) return false;
 
     uint32_t gopFrameInterval = m_config.fps * m_config.keyframeIntervalSec;
-    bool isKeyframe = m_forceKeyframe || ((m_frameIndex % gopFrameInterval) == 0);
+    bool isForced = m_forceKeyframe.load();
+    bool isKeyframe = isForced || ((m_frameIndex % gopFrameInterval) == 0);
     m_forceKeyframe = false;
+
+    if (isKeyframe) {
+        m_totalKeyframes++;
+        if (isForced && (m_frameIndex % gopFrameInterval) != 0) {
+            m_forcedRecoveryKeyframes++;
+        } else if (m_lastKeyframePtsUs > 0) {
+            int64_t deltaUs = timestampUs - m_lastKeyframePtsUs;
+            if (deltaUs > 0) {
+                m_observedGopSec = static_cast<float>(deltaUs) / 1000000.0f;
+            }
+        }
+        m_lastKeyframePtsUs = timestampUs;
+    }
 
     EncodedPacket packet;
     packet.pts = timestampUs;
@@ -51,7 +65,19 @@ bool HardwareEncoder::EncodeFrame(ID3D11Texture2D* texture, int64_t timestampUs,
     return true;
 }
 
+GopTelemetry HardwareEncoder::GetGopTelemetry() const {
+    GopTelemetry tele;
+    tele.configuredGopSec = static_cast<float>(m_config.keyframeIntervalSec);
+    tele.observedGopSec = m_observedGopSec;
+    tele.bFrames = m_config.bFrames;
+    tele.totalKeyframes = m_totalKeyframes;
+    tele.forcedRecoveryKeyframes = m_forcedRecoveryKeyframes;
+    tele.isCompliant = (tele.bFrames == 0) && (std::abs(tele.observedGopSec - tele.configuredGopSec) <= 0.05f);
+    return tele;
+}
+
 void HardwareEncoder::Flush() {
     m_frameIndex = 0;
     m_forceKeyframe = true;
+    m_lastKeyframePtsUs = 0;
 }
