@@ -797,48 +797,6 @@ class StreamEngine {
   }
 }
 
-class ChatAggregator {
-  constructor() {
-    this.messages = [
-      { id: '1', platform: 'velora', author: 'VeloraBot', badge: 'SYSTEM', badgeType: 'velora', text: 'Welcome to Velora Studio Native broadcast suite.' },
-      { id: '2', platform: 'velora', author: 'Sovereign_01', badge: 'VIP', badgeType: 'velora', text: 'Sub-second WHIP WebRTC ingest connected!' }
-    ];
-    this.filter = 'all';
-    this.onNewMessage = null;
-  }
-
-  start() {
-    const mockUsers = [
-      { platform: 'velora', author: 'ApexLegend', badge: 'PRO', badgeType: 'velora', text: 'Bitrate is rock solid 6000 kbps' },
-      { platform: 'twitch', author: 'GamerX99', badge: 'SUB', badgeType: 'twitch', text: 'Stream looks crispy at 1080p60!' },
-      { platform: 'kick', author: 'NeonRider', badge: 'OG', badgeType: 'kick', text: 'No dropped frames in the last 45 mins' }
-    ];
-
-    let idx = 0;
-    setInterval(() => {
-      if (idx < mockUsers.length) {
-        this.addMessage({ id: `msg-${Date.now()}`, ...mockUsers[idx] });
-        idx++;
-      }
-    }, 4500);
-  }
-
-  addMessage(msg) {
-    this.messages.push(msg);
-    if (this.onNewMessage) {
-      this.onNewMessage(msg);
-    }
-  }
-
-  setFilter(filter) {
-    this.filter = filter;
-  }
-
-  getFilteredMessages() {
-    if (this.filter === 'all') return this.messages;
-    return this.messages.filter(m => m.platform === this.filter);
-  }
-}
 
 class SceneManager {
   constructor() {

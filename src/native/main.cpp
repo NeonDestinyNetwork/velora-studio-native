@@ -47,9 +47,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         std::wstring args = L"--app=\"file:///" + htmlPath + L"\" "
                             L"--window-size=1360,860 "
                             L"--user-data-dir=\"" + userProfile + L"\" "
-                            L"--enable-features=WebRtcHideLocalIpsWithMdns "
+                            L"--allow-file-access-from-files "
+                            L"--disable-web-security "
+                            L"--allow-running-insecure-content "
+                            L"--enable-media-stream "
                             L"--autoplay-policy=no-user-gesture-required "
-                            L"--enable-media-stream";
+                            L"--enable-features=WebRtcHideLocalIpsWithMdns,MediaStreamTrackAudioSource";
 
         STARTUPINFOW si = { sizeof(STARTUPINFOW) };
         PROCESS_INFORMATION pi = {};
