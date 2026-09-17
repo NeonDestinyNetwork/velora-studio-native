@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Velora Studio Native — Luxury Broadcast Suite</title>
+  <link rel="stylesheet" href="./styles/tokens.css">
+  <link rel="stylesheet" href="./styles/studio.css">
+  <style>
+    /* Settings Modal & Overlays */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(3, 6, 17, 0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .modal-backdrop.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+    .settings-card {
+      width: 540px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-glass);
+      box-shadow: var(--shadow-md), var(--shadow-gold);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .settings-header {
+      padding: 16px 20px;
+      background: var(--bg-surface-elevated);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--gold-bright);
+    }
+    .settings-body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-height: 480px;
+      overflow-y: auto;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: rgba(255, 255, 255, 0.6);
+      font-weight: 600;
+    }
+    .form-input, .form-select {
+      background: var(--bg-cosmic);
+      border: 1px solid var(--border-subtle);
+      color: #FFF;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+    }
+    .form-input:focus, .form-select:focus {
+      border-color: var(--gold-primary);
+      box-shadow: 0 0 10px var(--gold-dim);
+    }
+    .settings-footer {
+      padding: 14px 20px;
+      background: var(--bg-surface-elevated);
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .btn-secondary {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      color: #FFF;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--gold-primary), var(--gold-dark));
+      border: none;
+      color: #000;
+      padding: 8px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Application Header -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="brand-logo">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="url(#gold-grad)"/>
+          <path d="M2 17L12 22L22 17M2 12L12 17L22 12" stroke="url(#gold-grad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="gold-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#FFE082"/>
+              <stop offset="0.5" stop-color="#D4AF37"/>
+              <stop offset="1" stop-color="#A88620"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span>VELORA STUDIO</span>
+        <span class="brand-badge">NATIVE</span>
+      </div>
+
+      <div class="profile-selector" id="btn-profile-select">
+        <span>🎬 Profile: Gaming 1080p60</span>
+        <span style="font-size: 10px; opacity: 0.6;">▼</span>
+      </div>
+    </div>
+
+    <!-- Window Controls & Global Settings -->
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button class="icon-btn" id="btn-open-settings" title="Broadcast & Ingest Settings">⚙</button>
+      <button class="icon-btn" id="btn-minimize" title="Minimize">🗕</button>
+      <button class="icon-btn" id="btn-maximize" title="Maximize">🗖</button>
+      <button class="icon-btn" id="btn-close" style="color: #FF5252;" title="Close">✕</button>
+    </div>
+  </header>
+
+  <!-- Multi-Stream Channels Strip -->
+  <nav class="channels-bar" id="channels-container">
+    <span class="channels-label">Multi-Stream:</span>
+    <!-- Dynamic Channels injected by JS -->
+  </nav>
+
+  <!-- Center Workspace (Canvas + Right Chat Dock) -->
+  <main class="workspace-container">
+    <!-- Center Live Canvas Viewport -->
+    <section class="canvas-viewport">
+      <div class="canvas-wrapper">
+        <canvas id="studio-canvas"></canvas>
+      </div>
+
+      <!-- Quick Transform Overlay Controls -->
+      <div class="canvas-controls-overlay">
+        <button class="icon-btn" id="btn-fit-screen" title="Fit to Screen">⛶ Fit</button>
+        <button class="icon-btn" id="btn-center-source" title="Center Layer">⊕ Center</button>
+        <button class="icon-btn" id="btn-lock-aspect" title="Lock 16:9 Aspect">🔒 Lock</button>
+        <div style="width: 1px; height: 16px; background: rgba(255,255,255,0.15); margin: 0 4px;"></div>
+        <button class="icon-btn" id="btn-screen-capture" title="Add Live Desktop Screen">🖥️ Screen</button>
+        <button class="icon-btn" id="btn-webcam-capture" title="Add Camera">📷 Camera</button>
+      </div>
+    </section>
+
+    <!-- Right Collapsible Chat & Widgets Dock -->
+    <aside class="right-dock" id="right-dock">
+      <div class="dock-header">
+        <div class="dock-tabs">
+          <div class="dock-tab active" data-filter="all">All Chat</div>
+          <div class="dock-tab" data-filter="velora">Velora</div>
+          <div class="dock-tab" data-filter="twitch">Twitch</div>
+          <div class="dock-tab" data-filter="kick">Kick</div>
+        </div>
+        <button class="icon-btn" id="btn-toggle-dock" title="Collapse Dock">⮞</button>
+      </div>
+
+      <!-- Live Chat Stream -->
+      <div class="chat-feed" id="chat-feed">
+        <!-- Messages injected dynamically -->
+      </div>
+
+      <!-- Quick Chat Input -->
+      <div style="padding: 10px; border-top: 1px solid var(--border-subtle); display: flex; gap: 6px;">
+        <input type="text" id="chat-input" placeholder="Send broadcast message..." class="form-input" style="flex: 1; padding: 6px 10px; font-size: 12px;">
+        <button class="btn-primary" id="btn-send-chat" style="padding: 6px 12px; font-size: 12px;">Send</button>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Bottom Control Deck (Scenes, Sources, Mixer, Go Live) -->
+  <footer class="bottom-deck">
+    <!-- Column 1: Scenes -->
+    <div class="deck-column">
+      <div class="deck-header">
+        <span>🎬 SCENES</span>
+        <div class="deck-actions">
+          <button class="icon-btn" id="btn-add-scene" title="Add Scene">+</button>
+          <button class="icon-btn" id="btn-del-scene" title="Remove Scene">−</button>
+        </div>
+      </div>
+      <div class="deck-list" id="scenes-list">
+        <!-- Injected dynamically -->
+      </div>
+    </div>
+
+    <!-- Column 2: Sources -->
+    <div class="deck-column">
+      <div class="deck-header">
+        <span>📦 SOURCES</span>
+        <div class="deck-actions">
+          <button class="icon-btn" id="btn-add-source" title="Add Source">+</button>
+          <button class="icon-btn" id="btn-del-source" title="Remove Source">−</button>
+          <button class="icon-btn" id="btn-source-props" title="Source Properties">⚙</button>
+        </div>
+      </div>
+      <div class="deck-list" id="sources-list">
+        <!-- Injected dynamically -->
+      </div>
+    </div>
+
+    <!-- Column 3: Professional Audio Mixer -->
+    <div class="deck-column">
+      <div class="deck-header">
+        <span>🔊 AUDIO MIXER</span>
+        <span style="font-size: 10px; color: var(--gold-primary); font-family: var(--font-mono);">48.0 kHz OPUS</span>
+      </div>
+      <div class="mixer-list" id="mixer-list">
+        <!-- Injected dynamically -->
+      </div>
+    </div>
+
+    <!-- Column 4: Master Broadcast Controls -->
+    <div class="master-controls-column">
+      <button class="btn-go-live" id="btn-go-live">
+        <span style="font-size: 18px;">🔴</span>
+        <span id="txt-go-live">GO LIVE</span>
+      </button>
+
+      <button class="btn-record" id="btn-record">
+        <span>⏺</span>
+        <span id="txt-record">START RECORDING</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- Bottom Telemetry Status Bar -->
+  <div class="app-status-bar">
+    <div class="status-group">
+      <div class="status-stat">
+        <span>RES:</span>
+        <span class="status-val" id="stat-res">1080p 60fps</span>
+      </div>
+      <div class="status-stat">
+        <span>BITRATE:</span>
+        <span class="status-val" id="stat-bitrate" style="color: var(--gold-bright);">6000 kbps</span>
+      </div>
+      <div class="status-stat">
+        <span>GOP:</span>
+        <span class="status-val" id="stat-gop">2.0s Strict</span>
+      </div>
+      <div class="status-stat">
+        <span>B-FRAMES:</span>
+        <span class="status-val" id="stat-bframes">0</span>
+      </div>
+    </div>
+
+    <div class="status-group">
+      <div class="status-stat">
+        <span>CPU:</span>
+        <span class="status-val" id="stat-cpu">0.8%</span>
+      </div>
+      <div class="status-stat">
+        <span>DROPPED:</span>
+        <span class="status-val" id="stat-dropped" style="color: var(--status-good);">0 (0.0%)</span>
+      </div>
+      <div class="status-stat">
+        <span>LIVE:</span>
+        <span class="status-val" id="stat-uptime" style="color: #FFF;">00:00:00</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Broadcast Settings Modal -->
+  <div class="modal-backdrop" id="settings-modal">
+    <div class="settings-card">
+      <div class="settings-header">
+        <span>⚙ Velora Studio Broadcast & Ingest Settings</span>
+        <button class="icon-btn" id="btn-close-modal" style="color: #FFF;">✕</button>
+      </div>
+      <div class="settings-body">
+        <div class="form-group">
+          <label class="form-label">Primary Broadcast Protocol</label>
+          <select class="form-select" id="cfg-protocol">
+            <option value="whip">Velora WHIP WebRTC (Sub-second Ultra Low Latency)</option>
+            <option value="rtmp">Velora RTMP (Standard Broadcasting)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Velora Stream Key</label>
+          <input type="password" class="form-input" id="cfg-key" value="live_velora_sec_994827103a4">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Video Ingest Resolution & Framerate</label>
+          <select class="form-select" id="cfg-resolution">
+            <option value="1080p60">1920x1080 @ 60 FPS (Gold Standard)</option>
+            <option value="1440p60">2560x1440 @ 60 FPS (2K Ultra)</option>
+            <option value="720p60">1280x720 @ 60 FPS (High Efficiency)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Video Encoder & Rate Control</label>
+          <select class="form-select" id="cfg-encoder">
+            <option value="nvenc">Hardware NVIDIA NVENC (H.264 / AV1) — CBR 6000 kbps</option>
+            <option value="amf">Hardware AMD AMF (H.264) — CBR 6000 kbps</option>
+            <option value="qsv">Hardware Intel QuickSync (H.264) — CBR 6000 kbps</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Audio Pipeline</label>
+          <input type="text" class="form-input" value="48.0 kHz • Opus Audio Codec • 320 kbps Stereo" disabled style="opacity: 0.7;">
+        </div>
+      </div>
+      <div class="settings-footer">
+        <button class="btn-secondary" id="btn-cancel-settings">Cancel</button>
+        <button class="btn-primary" id="btn-save-settings">Save & Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Studio JavaScript Orchestrator -->
+  <script type="module">
+    import { CanvasEngine } from './core/canvas-engine.js';
+    import { StreamEngine } from './core/stream-engine.js';
+    import { AudioEngine } from './core/audio-engine.js';
+    import { ChatAggregator } from './core/chat-aggregator.js';
+    import { SceneManager } from './core/scene-manager.js';
+
+    // 1. Initialize Core Engines
+    const canvas = document.getElementById('studio-canvas');
+    const canvasEngine = new CanvasEngine(canvas);
+    const streamEngine = new StreamEngine();
+    const audioEngine = new AudioEngine();
+    const chatAggregator = new ChatAggregator();
+    const sceneManager = new SceneManager();
+
+    // 2. Start Engines
+    canvasEngine.setSources(sceneManager.getActiveScene().sources);
+    canvasEngine.start();
+    audioEngine.init();
+    chatAggregator.start();
+
+    // 3. Render Channels Bar
+    const channelsContainer = document.getElementById('channels-container');
+    const destinations = streamEngine.getDefaultDestinations();
+
+    function renderChannels() {
+      // Keep the label
+      channelsContainer.innerHTML = '<span class="channels-label">Multi-Stream:</span>';
+      destinations.forEach(dest => {
+        const pill = document.createElement('div');
+        pill.className = `channel-pill ${dest.enabled ? 'active' : ''} ${dest.isLive ? 'live' : ''}`;
+        pill.innerHTML = `
+          <div class="channel-dot"></div>
+          <span style="font-weight: 700; color: ${dest.color};">[${dest.badge}]</span>
+          <span>${dest.name}</span>
+        `;
+        pill.onclick = () => {
+          dest.enabled = !dest.enabled;
+          renderChannels();
+        };
+        channelsContainer.appendChild(pill);
+      });
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'channel-add-btn';
+      addBtn.innerHTML = '<span>+</span> Add Custom RTMP';
+      addBtn.onclick = () => {
+        document.getElementById('settings-modal').classList.add('open');
+      };
+      channelsContainer.appendChild(addBtn);
+    }
+    renderChannels();
+
+    // 4. Render Scenes List
+    const scenesList = document.getElementById('scenes-list');
+    function renderScenes() {
+      scenesList.innerHTML = '';
+      sceneManager.scenes.forEach(scene => {
+        const item = document.createElement('div');
+        item.className = `list-item ${scene.id === sceneManager.activeSceneId ? 'selected' : ''}`;
+        item.innerHTML = `
+          <span>🎬 ${scene.name}</span>
+          <span style="font-size: 10px; opacity: 0.5;">${scene.sources.length} sources</span>
+        `;
+        item.onclick = () => {
+          sceneManager.switchScene(scene.id);
+          canvasEngine.setSources(scene.sources);
+          renderScenes();
+          renderSources();
+        };
+        scenesList.appendChild(item);
+      });
+    }
+    renderScenes();
+
+    // 5. Render Sources List
+    const sourcesList = document.getElementById('sources-list');
+    function renderSources() {
+      sourcesList.innerHTML = '';
+      const currentScene = sceneManager.getActiveScene();
+      currentScene.sources.forEach(src => {
+        const item = document.createElement('div');
+        item.className = `list-item ${src.id === sceneManager.selectedSourceId ? 'selected' : ''}`;
+        item.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="color: var(--gold-primary);">${src.type === 'display' ? '🖥️' : src.type === 'camera' ? '📷' : '🔤'}</span>
+            <span>${src.name}</span>
+          </div>
+          <div style="display: flex; gap: 4px;">
+            <button class="icon-btn" style="width: 20px; height: 20px;" onclick="event.stopPropagation(); toggleSourceVis('${src.id}')">${src.visible ? '👁️' : '🚫'}</button>
+            <button class="icon-btn" style="width: 20px; height: 20px;" onclick="event.stopPropagation(); toggleSourceLock('${src.id}')">${src.locked ? '🔒' : '🔓'}</button>
+          </div>
+        `;
+        item.onclick = () => {
+          sceneManager.selectedSourceId = src.id;
+          canvasEngine.selectSource(src.id);
+          renderSources();
+        };
+        sourcesList.appendChild(item);
+      });
+    }
+    renderSources();
+
+    window.toggleSourceVis = (id) => {
+      sceneManager.toggleSourceVisibility(id);
+      renderSources();
+    };
+    window.toggleSourceLock = (id) => {
+      sceneManager.toggleSourceLock(id);
+      renderSources();
+    };
+
+    // 6. Render Audio Mixer
+    const mixerList = document.getElementById('mixer-list');
+    function buildMixer() {
+      mixerList.innerHTML = '';
+      audioEngine.channels.forEach(ch => {
+        const channelDiv = document.createElement('div');
+        channelDiv.className = 'mixer-channel';
+        channelDiv.id = `mix-${ch.id}`;
+        channelDiv.innerHTML = `
+          <div class="mixer-channel-header">
+            <span>${ch.name}</span>
+            <span class="db-readout" style="color: var(--gold-bright); font-family: var(--font-mono);">${ch.peakDb} dB</span>
+          </div>
+          <div class="meter-track">
+            <div class="meter-fill" style="width: 50%;"></div>
+          </div>
+          <div class="mixer-controls">
+            <button class="icon-btn mute-btn" style="width: 24px; height: 24px;">🔊</button>
+            <input type="range" min="0" max="1" step="0.01" value="${ch.volume}" class="volume-slider">
+            <button class="icon-btn" style="width: 24px; height: 24px;">⚙</button>
+          </div>
+        `;
+
+        const slider = channelDiv.querySelector('.volume-slider');
+        slider.oninput = (e) => audioEngine.setVolume(ch.id, parseFloat(e.target.value));
+
+        const muteBtn = channelDiv.querySelector('.mute-btn');
+        muteBtn.onclick = () => {
+          const isMuted = audioEngine.toggleMute(ch.id);
+          muteBtn.textContent = isMuted ? '🔇' : '🔊';
+        };
+
+        mixerList.appendChild(channelDiv);
+      });
+    }
+    buildMixer();
+
+    // Hook Audio Meter Updates
+    audioEngine.onMeterUpdate = (channels) => {
+      channels.forEach(ch => {
+        const el = document.getElementById(`mix-${ch.id}`);
+        if (el) {
+          const fill = el.querySelector('.meter-fill');
+          const dbText = el.querySelector('.db-readout');
+          if (fill) fill.style.width = `${ch.peakPercent}%`;
+          if (dbText) dbText.textContent = `${ch.peakDb} dB`;
+        }
+      });
+    };
+
+    // 7. Render Chat Feed
+    const chatFeed = document.getElementById('chat-feed');
+    function renderChatMessage(msg) {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'chat-msg';
+      msgDiv.innerHTML = `
+        <div class="chat-author">
+          <span class="chat-badge badge-${msg.badgeType}">${msg.badge}</span>
+          <span>${msg.author}</span>
+        </div>
+        <div style="color: rgba(255,255,255,0.9);">${msg.text}</div>
+      `;
+      chatFeed.appendChild(msgDiv);
+      chatFeed.scrollTop = chatFeed.scrollHeight;
+    }
+
+    chatAggregator.onNewMessage = (msg) => {
+      if (chatAggregator.filter === 'all' || chatAggregator.filter === msg.platform) {
+        renderChatMessage(msg);
+      }
+    };
+
+    // Dock Tabs Filter
+    document.querySelectorAll('.dock-tab').forEach(tab => {
+      tab.onclick = () => {
+        document.querySelectorAll('.dock-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        chatAggregator.setFilter(tab.dataset.filter);
+        chatFeed.innerHTML = '';
+        chatAggregator.getFilteredMessages().forEach(renderChatMessage);
+      };
+    });
+
+    // Chat Send
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('btn-send-chat');
+    function sendChat() {
+      const text = chatInput.value.trim();
+      if (!text) return;
+      chatAggregator.addMessage({
+        id: `msg-${Date.now()}`,
+        platform: 'velora',
+        author: 'Host (You)',
+        badge: 'STREAMER',
+        badgeType: 'velora',
+        text: text,
+        timestamp: new Date()
+      });
+      chatInput.value = '';
+    }
+    sendBtn.onclick = sendChat;
+    chatInput.onkeydown = (e) => { if (e.key === 'Enter') sendChat(); };
+
+    // 8. Master GO LIVE button
+    const btnGoLive = document.getElementById('btn-go-live');
+    const txtGoLive = document.getElementById('txt-go-live');
+
+    btnGoLive.onclick = async () => {
+      if (!streamEngine.isLive) {
+        await streamEngine.startBroadcast(canvasEngine.getStream(), destinations);
+        btnGoLive.classList.add('live');
+        txtGoLive.textContent = 'END BROADCAST';
+        renderChannels();
+      } else {
+        streamEngine.stopBroadcast();
+        btnGoLive.classList.remove('live');
+        txtGoLive.textContent = 'GO LIVE';
+        renderChannels();
+        document.getElementById('stat-uptime').textContent = '00:00:00';
+      }
+    };
+
+    // Master Record Button
+    const btnRecord = document.getElementById('btn-record');
+    const txtRecord = document.getElementById('txt-record');
+    btnRecord.onclick = () => {
+      streamEngine.isRecording = !streamEngine.isRecording;
+      btnRecord.classList.toggle('recording', streamEngine.isRecording);
+      txtRecord.textContent = streamEngine.isRecording ? 'STOP RECORDING' : 'START RECORDING';
+    };
+
+    // Stream Engine Telemetry Hooks
+    streamEngine.onMetricsUpdate = (m) => {
+      document.getElementById('stat-bitrate').textContent = `${m.bitrateKbps} kbps`;
+      document.getElementById('stat-cpu').textContent = `${m.cpuUsage}%`;
+      document.getElementById('stat-uptime').textContent = streamEngine.getFormattedUptime();
+    };
+
+    // 9. Live Screen / Webcam capture triggers
+    document.getElementById('btn-screen-capture').onclick = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.autoplay = true;
+        video.muted = true;
+        sceneManager.addSourceToActive({
+          name: 'Live Desktop Display',
+          type: 'display',
+          mediaElement: video
+        });
+        renderSources();
+      } catch (err) {
+        console.log('Screen capture dismissed or cancelled:', err);
+      }
+    };
+
+    document.getElementById('btn-webcam-capture').onclick = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.autoplay = true;
+        video.muted = true;
+        sceneManager.addSourceToActive({
+          name: 'Live HD Webcam',
+          type: 'camera',
+          width: 640,
+          height: 360,
+          x: 1240,
+          y: 680,
+          mediaElement: video
+        });
+        renderSources();
+      } catch (err) {
+        console.log('Camera capture dismissed or cancelled:', err);
+      }
+    };
+
+    // Modal Handling
+    const settingsModal = document.getElementById('settings-modal');
+    document.getElementById('btn-open-settings').onclick = () => settingsModal.classList.add('open');
+    document.getElementById('btn-close-modal').onclick = () => settingsModal.classList.remove('open');
+    document.getElementById('btn-cancel-settings').onclick = () => settingsModal.classList.remove('open');
+    document.getElementById('btn-save-settings').onclick = () => {
+      settingsModal.classList.remove('open');
+    };
+
+    // Dock Collapse Toggle
+    const rightDock = document.getElementById('right-dock');
+    document.getElementById('btn-toggle-dock').onclick = () => {
+      rightDock.classList.toggle('collapsed');
+    };
+  </script>
+</body>
+</html>

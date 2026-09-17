@@ -1,0 +1,60 @@
+name: Build Velora Studio Native (Clean x64 Windows Suite)
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  build-native-suite:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout Velora Studio Source
+        uses: actions/checkout@v4
+
+      - name: Setup Visual Studio MSVC Developer Environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Package Velora Studio Native Distribution
+        shell: bash
+        run: |
+          mkdir -p dist/bin/64bit dist/data/themes dist/data/config dist-installer
+          
+          # Copy source assets into distribution package
+          cp -r src/* dist/
+          cp -r config/* dist/data/config/ 2>/dev/null || true
+          cp -r theme/* dist/data/themes/ 2>/dev/null || true
+          
+          # Create batch launcher
+          printf '@echo off\r\nstart "" "%%~dp0index.html"\r\n' > "dist/Launch Velora Studio.bat"
+
+      - name: Compile Native Win32 Launcher (VeloraStudio.exe)
+        shell: cmd
+        run: |
+          echo Compiling Native C++ Launcher...
+          cl /nologo /O2 /EHsc /Fe:dist\VeloraStudio.exe launcher\launcher.cpp /link /SUBSYSTEM:WINDOWS user32.lib shell32.lib
+          if exist "dist\launcher.obj" del "dist\launcher.obj"
+
+      - name: Build Official Windows Setup Installer (.exe)
+        shell: cmd
+        run: |
+          echo Compiling NSIS Windows Setup Installer...
+          makensis /DSOURCEDIR="%CD%\dist" /DOUTDIR="%CD%\dist-installer" installer\velora-installer.nsi
+
+      - name: Upload Velora Studio Portable Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Velora-Studio-Windows-x64-Portable
+          path: dist/
+          if-no-files-found: warn
+
+      - name: Upload Velora Studio Official Setup Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Velora-Studio-Windows-Installer
+          path: dist-installer/
+          if-no-files-found: warn

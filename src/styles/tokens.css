@@ -1,0 +1,62 @@
+/* ==============================================================================
+   VELORA STUDIO NATIVE — DESIGN SYSTEM TOKENS
+   Theme: Obsidian & Royal Gold Luxury Broadcast Suite
+   ============================================================================== */
+
+:root {
+  /* Color Palette - Cosmic Obsidian */
+  --bg-cosmic: #030611;
+  --bg-obsidian: #070B1E;
+  --bg-surface: #0B112C;
+  --bg-surface-elevated: #11183C;
+  --bg-surface-hover: #192350;
+  --bg-glass: rgba(11, 17, 44, 0.75);
+  --bg-glass-heavy: rgba(7, 11, 30, 0.88);
+
+  /* Accents - Royal Velora Gold */
+  --gold-primary: #D4AF37;
+  --gold-light: #F3D062;
+  --gold-bright: #FFE082;
+  --gold-dark: #A88620;
+  --gold-dim: rgba(212, 175, 55, 0.15);
+  --gold-glow: rgba(212, 175, 55, 0.35);
+
+  /* Brand Accents & Status */
+  --accent-cyan: #00E5FF;
+  --accent-purple: #9D4EDD;
+  --status-live: #FF2A55;
+  --status-rec: #FF334B;
+  --status-good: #00E676;
+  --status-warn: #FFD600;
+  --status-error: #FF1744;
+
+  /* Multi-Stream Platforms */
+  --color-velora: #D4AF37;
+  --color-twitch: #9146FF;
+  --color-kick: #53FC18;
+  --color-youtube: #FF0000;
+  --color-facebook: #1877F2;
+  --color-custom: #00E5FF;
+
+  /* Typography */
+  --font-main: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+
+  /* Borders & Dividers */
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-glass: rgba(212, 175, 55, 0.2);
+  --border-active: #D4AF37;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.6);
+  --shadow-gold: 0 0 16px rgba(212, 175, 55, 0.25);
+  --shadow-live: 0 0 20px rgba(255, 42, 85, 0.4);
+
+  /* Layout Measurements */
+  --header-height: 48px;
+  --channels-bar-height: 40px;
+  --bottom-dock-height: 230px;
+  --chat-dock-width: 320px;
+  --status-bar-height: 32px;
+}
