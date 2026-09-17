@@ -440,29 +440,46 @@ class AudioEngine {
     this.startMeterLoop();
   }
 
-  async requestMicrophoneAccess() {
+  async getAvailableAudioDevices() {
     try {
-      if (this.audioContext && this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      return devices.filter(d => d.kind === 'audioinput');
+    } catch (err) {
+      console.warn('Could not enumerate audio devices:', err);
+      return [];
+    }
+  }
+
+  async setAudioInputDevice(deviceId) {
+    try {
+      if (this.micStream) {
+        this.micStream.getTracks().forEach(t => t.stop());
       }
       this.micStream = await navigator.mediaDevices.getUserMedia({
         audio: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
           sampleRate: 48000
         }
       });
-
       if (this.audioContext && this.micGain) {
+        if (this.micSource) {
+          this.micSource.disconnect();
+        }
         this.micSource = this.audioContext.createMediaStreamSource(this.micStream);
         this.micSource.connect(this.micGain);
       }
       return true;
     } catch (err) {
-      console.warn('Microphone permission dismissed or unavailable:', err);
+      console.warn('Failed to switch audio input device:', err);
       return false;
     }
+  }
+
+  async requestMicrophoneAccess(deviceId) {
+    return this.setAudioInputDevice(deviceId);
   }
 
   attachDesktopAudio(stream) {
@@ -534,6 +551,36 @@ class AudioEngine {
 
   getMixedAudioStream() {
     return this.destination ? this.destination.stream : null;
+  }
+}
+
+class ChatAggregator {
+  constructor() {
+    this.messages = [
+      { id: '1', platform: 'velora', author: 'Velora Studio', badge: 'SYSTEM', badgeType: 'velora', text: 'Broadcast control surface active. Ready to stream.' }
+    ];
+    this.filter = 'all';
+    this.onNewMessage = null;
+  }
+
+  start() {
+    // Clean broadcast console - only receives real messages
+  }
+
+  addMessage(msg) {
+    this.messages.push(msg);
+    if (this.onNewMessage) {
+      this.onNewMessage(msg);
+    }
+  }
+
+  setFilter(filter) {
+    this.filter = filter;
+  }
+
+  getFilteredMessages() {
+    if (this.filter === 'all') return this.messages;
+    return this.messages.filter(m => m.platform === this.filter);
   }
 }
 

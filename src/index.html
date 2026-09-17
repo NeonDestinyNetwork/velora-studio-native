@@ -381,6 +381,50 @@
           <span style="font-weight: 700; color: #FFF;">Solid Color</span>
           <span style="font-size: 11px; opacity: 0.6;">Backdrops & Panels</span>
         </button>
+  <!-- Audio Device Selector Modal -->
+  <div class="modal-backdrop" id="audio-device-modal">
+    <div class="settings-card" style="width: 480px;">
+      <div class="settings-header">
+        <span>🎤 Select Physical Audio Input (Microphone)</span>
+        <button class="icon-btn" id="btn-close-audio-modal" style="color: #FFF;">✕</button>
+      </div>
+      <div class="settings-body">
+        <div class="form-group">
+          <label class="form-label">Available Physical Hardware Microphones</label>
+          <select class="form-select" id="sel-audio-device">
+            <option value="">Default System Microphone</option>
+          </select>
+        </div>
+        <p style="font-size: 12px; color: rgba(255,255,255,0.7); line-height: 1.5;">
+          Select your dedicated streaming microphone, USB audio interface, or headset input. The VU meters will measure this device in real-time.
+        </p>
+      </div>
+      <div class="settings-footer">
+        <button class="btn-primary" id="btn-save-audio-device">Apply & Listen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Camera Device Selector Modal -->
+  <div class="modal-backdrop" id="camera-device-modal">
+    <div class="settings-card" style="width: 480px;">
+      <div class="settings-header">
+        <span>📷 Select Physical Camera / Capture Card</span>
+        <button class="icon-btn" id="btn-close-camera-modal" style="color: #FFF;">✕</button>
+      </div>
+      <div class="settings-body">
+        <div class="form-group">
+          <label class="form-label">Available Physical Video Devices</label>
+          <select class="form-select" id="sel-camera-device">
+            <option value="">Default Web Camera</option>
+          </select>
+        </div>
+        <p style="font-size: 12px; color: rgba(255,255,255,0.7); line-height: 1.5;">
+          Select your webcam, DSLR via CamLink, or capture card device.
+        </p>
+      </div>
+      <div class="settings-footer">
+        <button class="btn-primary" id="btn-save-camera-device">Apply Camera</button>
       </div>
     </div>
   </div>
@@ -728,8 +772,35 @@
       }
     };
 
-    // 6. Render Audio Mixer
+    // 6. Render Audio Mixer with Hardware Device Selectors
     const mixerList = document.getElementById('mixer-list');
+    const audioModal = document.getElementById('audio-device-modal');
+    const selAudioDevice = document.getElementById('sel-audio-device');
+    const btnSaveAudio = document.getElementById('btn-save-audio-device');
+    const btnCloseAudio = document.getElementById('btn-close-audio-modal');
+
+    btnCloseAudio.onclick = () => audioModal.classList.remove('open');
+
+    async function openAudioDeviceModal() {
+      // Ensure permissions requested to enumerate labels
+      await audioEngine.requestMicrophoneAccess();
+      const devices = await audioEngine.getAvailableAudioDevices();
+      selAudioDevice.innerHTML = '<option value="">Default System Microphone</option>';
+      devices.forEach((dev, idx) => {
+        const opt = document.createElement('option');
+        opt.value = dev.deviceId;
+        opt.textContent = dev.label || `Microphone Input ${idx + 1}`;
+        selAudioDevice.appendChild(opt);
+      });
+      audioModal.classList.add('open');
+    }
+
+    btnSaveAudio.onclick = async () => {
+      const devId = selAudioDevice.value;
+      await audioEngine.setAudioInputDevice(devId);
+      audioModal.classList.remove('open');
+    };
+
     function buildMixer() {
       mixerList.innerHTML = '';
       audioEngine.channels.forEach(ch => {
@@ -747,7 +818,7 @@
           <div class="mixer-controls">
             <button class="icon-btn mute-btn" style="width: 24px; height: 24px;">🔊</button>
             <input type="range" min="0" max="1" step="0.01" value="${ch.volume}" class="volume-slider">
-            <button class="icon-btn" style="width: 24px; height: 24px;" onclick="audioEngine.requestMicrophoneAccess()">🎤</button>
+            <button class="icon-btn device-cfg-btn" style="width: 24px; height: 24px;" title="Select Physical Device">⚙</button>
           </div>
         `;
 
@@ -759,6 +830,15 @@
           const isMuted = audioEngine.toggleMute(ch.id);
           muteBtn.textContent = isMuted ? '🔇' : '🔊';
         };
+
+        const cfgBtn = channelDiv.querySelector('.device-cfg-btn');
+        if (ch.id === 'mic') {
+          cfgBtn.onclick = openAudioDeviceModal;
+        } else {
+          cfgBtn.onclick = () => {
+            alert('Desktop audio is automatically captured from your active monitor/window stream.');
+          };
+        }
 
         mixerList.appendChild(channelDiv);
       });
