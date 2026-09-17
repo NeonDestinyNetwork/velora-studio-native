@@ -53,15 +53,17 @@ struct OutputStats {
     bool isConnected = false;
 };
 
-// Canonical RTP Clock Domain Helpers (translates canonical microsecond timeline)
-inline uint32_t RtpTimestampFromMicrosecondsVideo(int64_t ptsUs) {
-    // 90 kHz clock for H.264 video
-    return static_cast<uint32_t>((ptsUs * 90) / 1000);
+// Overflow-Safe 64-bit Canonical RTP Clock Domain Helpers
+inline uint32_t ToVideoRtpTimestamp(int64_t sessionPtsUs) {
+    if (sessionPtsUs < 0) sessionPtsUs = 0;
+    // 90 kHz clock for H.264 video: (sessionPtsUs * 90000ULL) / 1000000ULL
+    return static_cast<uint32_t>((static_cast<uint64_t>(sessionPtsUs) * 90000ULL) / 1000000ULL);
 }
 
-inline uint32_t RtpTimestampFromMicrosecondsAudio(int64_t ptsUs) {
-    // 48 kHz clock for Opus / AAC audio
-    return static_cast<uint32_t>((ptsUs * 48) / 1000);
+inline uint32_t ToOpusRtpTimestamp(int64_t sessionPtsUs) {
+    if (sessionPtsUs < 0) sessionPtsUs = 0;
+    // 48 kHz clock for Opus audio: (sessionPtsUs * 48000ULL) / 1000000ULL
+    return static_cast<uint32_t>((static_cast<uint64_t>(sessionPtsUs) * 48000ULL) / 1000000ULL);
 }
 
 #include <functional>
@@ -150,6 +152,10 @@ private:
     void PurgeToNextIDR();
     uint32_t CalculateQueuedDurationMs_Locked() const;
 
+    // RTP Packetizers
+    void PacketizeH264(const uint8_t* data, size_t size, uint32_t rtpTimestamp, bool isKeyframe);
+    void PacketizeOpus(const uint8_t* data, size_t size, uint32_t rtpTimestamp);
+
     std::string m_id;
     std::string m_name;
     std::string m_whipUrl;
@@ -165,6 +171,11 @@ private:
     std::atomic<WHIPLifecycleState> m_lifecycleState{ WHIPLifecycleState::Idle };
     std::thread m_workerThread;
     KeyframeRequestCallback m_keyframeRequestCb = nullptr;
+
+    // Session Epoch (microsecond PTS offset)
+    std::atomic<int64_t> m_sessionStartPtsUs{ -1 };
+    uint16_t m_videoSeqNum = 0;
+    uint16_t m_audioSeqNum = 0;
 
     std::deque<std::shared_ptr<EncodedPacket>> m_packetQueue;
     mutable std::mutex m_queueMutex;

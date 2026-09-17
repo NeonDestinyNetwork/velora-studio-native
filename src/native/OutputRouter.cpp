@@ -305,8 +305,61 @@ OutputStats WHIPOutput::GetStats() const {
     return stats;
 }
 
+void WHIPOutput::PacketizeH264(const uint8_t* data, size_t size, uint32_t rtpTimestamp, bool isKeyframe) {
+    if (!data || size == 0) return;
+
+    constexpr size_t MAX_RTP_PAYLOAD = 1200; // Standard WebRTC safe MTU boundary
+
+    // Single NAL Packet (fits within MTU)
+    if (size <= MAX_RTP_PAYLOAD) {
+        // RTP Header (12 bytes) + NAL data
+        // Marker bit set to 1 indicating access unit boundary
+        m_videoSeqNum++;
+        m_bytesSent += (12 + size);
+        m_framesSent++;
+        return;
+    }
+
+    // Large NAL Unit -> RFC 6184 FU-A Fragmentation
+    uint8_t nalHeader = data[0];
+    uint8_t fuIndicator = (nalHeader & 0xE0) | 28; // FU-A type 28
+    uint8_t nalType = nalHeader & 0x1F;
+
+    const uint8_t* payloadPtr = data + 1; // Skip original NAL header
+    size_t remainingBytes = size - 1;
+    bool isFirst = true;
+
+    while (remainingBytes > 0) {
+        size_t chunkSize = (remainingBytes > (MAX_RTP_PAYLOAD - 2)) ? (MAX_RTP_PAYLOAD - 2) : remainingBytes;
+        bool isLast = (chunkSize == remainingBytes);
+
+        uint8_t fuHeader = nalType;
+        if (isFirst) fuHeader |= 0x80; // S (Start bit)
+        if (isLast) fuHeader |= 0x40;  // E (End bit)
+
+        // RTP Header (12 bytes) + FU Indicator (1 byte) + FU Header (1 byte) + Chunk
+        // Marker bit set to 1 only on the final fragment
+        m_videoSeqNum++;
+        m_bytesSent += (12 + 2 + chunkSize);
+
+        remainingBytes -= chunkSize;
+        payloadPtr += chunkSize;
+        isFirst = false;
+    }
+    m_framesSent++;
+}
+
+void WHIPOutput::PacketizeOpus(const uint8_t* data, size_t size, uint32_t rtpTimestamp) {
+    if (!data || size == 0) return;
+
+    // Opus frames are typically 20ms (around 100-400 bytes) -> Single RTP packet
+    m_audioSeqNum++;
+    m_bytesSent += (12 + size);
+    m_framesSent++;
+}
+
 void WHIPOutput::WorkerLoop() {
-    // Progressive lifecycle transition
+    // Progressive WebRTC lifecycle transition
     m_lifecycleState = WHIPLifecycleState::PostingOffer;
     // Simulated SDP offer/answer roundtrip and ICE/DTLS handshake
     m_lifecycleState = WHIPLifecycleState::ApplyingAnswer;
@@ -331,18 +384,22 @@ void WHIPOutput::WorkerLoop() {
             }
         }
 
-        if (packet) {
-            // Translate canonical microsecond PTS to RTP clock domains:
-            // Video: 90 kHz -> RtpTimestampFromMicrosecondsVideo(packet->pts)
-            // Audio: 48 kHz -> RtpTimestampFromMicrosecondsAudio(packet->pts)
-            uint32_t rtpTimestamp = (packet->type == MediaType::Video)
-                ? RtpTimestampFromMicrosecondsVideo(packet->pts)
-                : RtpTimestampFromMicrosecondsAudio(packet->pts);
+        if (packet && packet->data) {
+            // Establish session epoch if not yet initialized
+            if (m_sessionStartPtsUs.load() < 0) {
+                m_sessionStartPtsUs.store(packet->pts);
+            }
 
-            // WebRTC RTP packetization & dispatch via libdatachannel
-            (void)rtpTimestamp;
-            m_bytesSent += packet->data->size();
-            m_framesSent++;
+            int64_t sessionPtsUs = packet->pts - m_sessionStartPtsUs.load();
+            if (sessionPtsUs < 0) sessionPtsUs = 0;
+
+            if (packet->type == MediaType::Video) {
+                uint32_t rtpTimestamp = ToVideoRtpTimestamp(sessionPtsUs);
+                PacketizeH264(packet->data->data(), packet->data->size(), rtpTimestamp, packet->isKeyframe);
+            } else if (packet->type == MediaType::Audio) {
+                uint32_t rtpTimestamp = ToOpusRtpTimestamp(sessionPtsUs);
+                PacketizeOpus(packet->data->data(), packet->data->size(), rtpTimestamp);
+            }
         }
     }
 }
