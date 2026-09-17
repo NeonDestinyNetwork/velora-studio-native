@@ -68,3 +68,41 @@ jobs:
           name: Velora-Studio-Windows-x64
           path: dist/
           if-no-files-found: warn
+
+  release-suite:
+    needs: [build-linux-suite, build-windows-suite]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    name: Publish Official Velora Studio Release
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Linux Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Velora-Studio-Linux-x64
+          path: Velora-Studio-Linux-x64
+
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Velora-Studio-Windows-x64
+          path: Velora-Studio-Windows-x64
+
+      - name: Archive Distribution Packages
+        run: |
+          zip -r Velora-Studio-Linux-x64.zip Velora-Studio-Linux-x64
+          zip -r Velora-Studio-Windows-x64.zip Velora-Studio-Windows-x64
+
+      - name: Create Official GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            Velora-Studio-Linux-x64.zip
+            Velora-Studio-Windows-x64.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+
