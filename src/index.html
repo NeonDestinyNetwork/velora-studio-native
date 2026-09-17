@@ -338,13 +338,9 @@
     </div>
   </div>
 
-  <!-- Studio JavaScript Orchestrator -->
-  <script type="module">
-    import { CanvasEngine } from './core/canvas-engine.js';
-    import { StreamEngine } from './core/stream-engine.js';
-    import { AudioEngine } from './core/audio-engine.js';
-    import { ChatAggregator } from './core/chat-aggregator.js';
-    import { SceneManager } from './core/scene-manager.js';
+  <!-- Studio JavaScript Orchestrator (Zero-CORS bundle for local file:// and webviews) -->
+  <script src="./core/studio-bundle.js"></script>
+  <script>
 
     // 1. Initialize Core Engines
     const canvas = document.getElementById('studio-canvas');
