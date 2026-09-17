@@ -338,6 +338,57 @@
     </div>
   </div>
 
+  <!-- Add Source Picker Modal -->
+  <div class="modal-backdrop" id="add-source-modal">
+    <div class="settings-card" style="width: 480px;">
+      <div class="settings-header">
+        <span>➕ Add Live Broadcast Source</span>
+        <button class="icon-btn" id="btn-close-source-modal" style="color: #FFF;">✕</button>
+      </div>
+      <div class="settings-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <button class="btn-secondary" id="btn-add-screen-src" style="padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;">
+          <span style="font-size: 28px;">🖥️</span>
+          <span style="font-weight: 700; color: #FFF;">Screen / Display</span>
+          <span style="font-size: 11px; opacity: 0.6;">Direct 60 FPS Capture</span>
+        </button>
+
+        <button class="btn-secondary" id="btn-add-camera-src" style="padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;">
+          <span style="font-size: 28px;">📷</span>
+          <span style="font-weight: 700; color: #FFF;">Camera / Webcam</span>
+          <span style="font-size: 11px; opacity: 0.6;">HD Video Ingest</span>
+        </button>
+
+        <button class="btn-secondary" id="btn-add-video-src" style="padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;">
+          <span style="font-size: 28px;">📁</span>
+          <span style="font-weight: 700; color: #FFF;">Media / Video File</span>
+          <span style="font-size: 11px; opacity: 0.6;">MP4 / WebM / Clips</span>
+        </button>
+
+        <button class="btn-secondary" id="btn-add-image-src" style="padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;">
+          <span style="font-size: 28px;">🖼️</span>
+          <span style="font-weight: 700; color: #FFF;">Image Overlay</span>
+          <span style="font-size: 11px; opacity: 0.6;">PNG / GIF / JPG / Logos</span>
+        </button>
+
+        <button class="btn-secondary" id="btn-add-text-src" style="padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;">
+          <span style="font-size: 28px;">🔤</span>
+          <span style="font-weight: 700; color: #FFF;">Text Banner</span>
+          <span style="font-size: 11px; opacity: 0.6;">Stream Titles & Tickers</span>
+        </button>
+
+        <button class="btn-secondary" id="btn-add-color-src" style="padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;">
+          <span style="font-size: 28px;">🎨</span>
+          <span style="font-weight: 700; color: #FFF;">Solid Color</span>
+          <span style="font-size: 11px; opacity: 0.6;">Backdrops & Panels</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden File Pickers -->
+  <input type="file" id="file-video-input" accept="video/mp4,video/webm,video/ogg" style="display: none;">
+  <input type="file" id="file-image-input" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" style="display: none;">
+
   <!-- Studio JavaScript Orchestrator (Zero-CORS bundle for local file:// and webviews) -->
   <script src="./core/studio-bundle.js"></script>
   <script>
@@ -356,12 +407,18 @@
     audioEngine.init();
     chatAggregator.start();
 
+    // Automatically prompt microphone access on first user interaction so VU meters go live
+    window.addEventListener('click', () => {
+      if (!audioEngine.micStream) {
+        audioEngine.requestMicrophoneAccess();
+      }
+    }, { once: true });
+
     // 3. Render Channels Bar
     const channelsContainer = document.getElementById('channels-container');
     const destinations = streamEngine.getDefaultDestinations();
 
     function renderChannels() {
-      // Keep the label
       channelsContainer.innerHTML = '<span class="channels-label">Multi-Stream:</span>';
       destinations.forEach(dest => {
         const pill = document.createElement('div');
@@ -370,6 +427,7 @@
           <div class="channel-dot"></div>
           <span style="font-weight: 700; color: ${dest.color};">[${dest.badge}]</span>
           <span>${dest.name}</span>
+          <span style="font-size: 9px; opacity: 0.7; margin-left: 4px;">(${dest.statusText})</span>
         `;
         pill.onclick = () => {
           dest.enabled = !dest.enabled;
@@ -410,6 +468,25 @@
     }
     renderScenes();
 
+    // Add Scene & Del Scene
+    document.getElementById('btn-add-scene').onclick = () => {
+      const name = prompt('Enter new scene name:', `Scene ${sceneManager.scenes.length + 1}`);
+      if (name) {
+        sceneManager.addScene(name);
+        canvasEngine.setSources(sceneManager.getActiveScene().sources);
+        renderScenes();
+        renderSources();
+      }
+    };
+    document.getElementById('btn-del-scene').onclick = () => {
+      if (confirm('Delete active scene?')) {
+        sceneManager.removeActiveScene();
+        canvasEngine.setSources(sceneManager.getActiveScene().sources);
+        renderScenes();
+        renderSources();
+      }
+    };
+
     // 5. Render Sources List
     const sourcesList = document.getElementById('sources-list');
     function renderSources() {
@@ -419,11 +496,11 @@
         const item = document.createElement('div');
         item.className = `list-item ${src.id === sceneManager.selectedSourceId ? 'selected' : ''}`;
         item.innerHTML = `
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <span style="color: var(--gold-primary);">${src.type === 'display' ? '🖥️' : src.type === 'camera' ? '📷' : '🔤'}</span>
-            <span>${src.name}</span>
+          <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <span style="color: var(--gold-primary);">${src.type === 'display' ? '🖥️' : src.type === 'camera' ? '📷' : src.type === 'image' ? '🖼️' : src.type === 'media' ? '📁' : '🔤'}</span>
+            <span style="font-size: 12px;">${src.name}</span>
           </div>
-          <div style="display: flex; gap: 4px;">
+          <div style="display: flex; gap: 4px; flex-shrink: 0;">
             <button class="icon-btn" style="width: 20px; height: 20px;" onclick="event.stopPropagation(); toggleSourceVis('${src.id}')">${src.visible ? '👁️' : '🚫'}</button>
             <button class="icon-btn" style="width: 20px; height: 20px;" onclick="event.stopPropagation(); toggleSourceLock('${src.id}')">${src.locked ? '🔒' : '🔓'}</button>
           </div>
@@ -438,6 +515,11 @@
     }
     renderSources();
 
+    window.onSourceSelected = (id) => {
+      sceneManager.selectedSourceId = id;
+      renderSources();
+    };
+
     window.toggleSourceVis = (id) => {
       sceneManager.toggleSourceVisibility(id);
       renderSources();
@@ -445,6 +527,205 @@
     window.toggleSourceLock = (id) => {
       sceneManager.toggleSourceLock(id);
       renderSources();
+    };
+
+    // Remove Source
+    document.getElementById('btn-del-source').onclick = () => {
+      sceneManager.removeSelectedSource();
+      canvasEngine.setSources(sceneManager.getActiveScene().sources);
+      renderSources();
+    };
+
+    // Add Source Modal open/close
+    const addSourceModal = document.getElementById('add-source-modal');
+    document.getElementById('btn-add-source').onclick = () => addSourceModal.classList.add('open');
+    document.getElementById('btn-close-source-modal').onclick = () => addSourceModal.classList.remove('open');
+
+    // Add Source Actions
+    async function activateScreenCapture() {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 60 }, audio: true });
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.autoplay = true;
+        video.muted = true;
+        video.play();
+
+        // Attach audio to audio mixer if available
+        audioEngine.attachDesktopAudio(stream);
+
+        // Check if active scene has display source
+        const scene = sceneManager.getActiveScene();
+        let existing = scene.sources.find(s => s.type === 'display');
+        if (existing) {
+          existing.mediaElement = video;
+          existing.name = 'Primary Display (Live)';
+        } else {
+          sceneManager.addSourceToActive({
+            name: 'Primary Display (Live)',
+            type: 'display',
+            mediaElement: video,
+            x: 0, y: 0, width: 1920, height: 1080
+          });
+        }
+        canvasEngine.setSources(scene.sources);
+        renderSources();
+      } catch (err) {
+        console.warn('Screen capture cancelled or error:', err);
+      }
+    }
+
+    async function activateWebcamCapture() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, frameRate: 60 } });
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.autoplay = true;
+        video.muted = true;
+        video.play();
+
+        const scene = sceneManager.getActiveScene();
+        let existing = scene.sources.find(s => s.type === 'camera');
+        if (existing) {
+          existing.mediaElement = video;
+          existing.name = 'Streamer Camera (Live)';
+        } else {
+          sceneManager.addSourceToActive({
+            name: 'Streamer Camera (Live)',
+            type: 'camera',
+            mediaElement: video,
+            x: 1380, y: 700, width: 500, height: 340
+          });
+        }
+        canvasEngine.setSources(scene.sources);
+        renderSources();
+      } catch (err) {
+        console.warn('Webcam capture cancelled or error:', err);
+      }
+    }
+
+    document.getElementById('btn-add-screen-src').onclick = () => {
+      addSourceModal.classList.remove('open');
+      activateScreenCapture();
+    };
+
+    document.getElementById('btn-add-camera-src').onclick = () => {
+      addSourceModal.classList.remove('open');
+      activateWebcamCapture();
+    };
+
+    const fileVideoInput = document.getElementById('file-video-input');
+    document.getElementById('btn-add-video-src').onclick = () => {
+      addSourceModal.classList.remove('open');
+      fileVideoInput.click();
+    };
+    fileVideoInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const video = document.createElement('video');
+        video.src = URL.createObjectURL(file);
+        video.autoplay = true;
+        video.loop = true;
+        video.muted = true;
+        video.play();
+        sceneManager.addSourceToActive({
+          name: file.name.substring(0, 20),
+          type: 'media',
+          mediaElement: video,
+          x: 480, y: 270, width: 960, height: 540
+        });
+        canvasEngine.setSources(sceneManager.getActiveScene().sources);
+        renderSources();
+      }
+    };
+
+    const fileImageInput = document.getElementById('file-image-input');
+    document.getElementById('btn-add-image-src').onclick = () => {
+      addSourceModal.classList.remove('open');
+      fileImageInput.click();
+    };
+    fileImageInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        img.onload = () => {
+          sceneManager.addSourceToActive({
+            name: file.name.substring(0, 20),
+            type: 'image',
+            imageElement: img,
+            x: 100, y: 100, width: img.width || 400, height: img.height || 300
+          });
+          canvasEngine.setSources(sceneManager.getActiveScene().sources);
+          renderSources();
+        };
+      }
+    };
+
+    document.getElementById('btn-add-text-src').onclick = () => {
+      addSourceModal.classList.remove('open');
+      const text = prompt('Enter overlay banner text:', 'VELORA NETWORK • 60 FPS • LIVE');
+      if (text) {
+        sceneManager.addSourceToActive({
+          name: 'Text: ' + text.substring(0, 15),
+          type: 'text',
+          text: text,
+          color: '#D4AF37',
+          fontSize: 28,
+          fontWeight: '800',
+          x: 60, y: 60, width: 600, height: 40
+        });
+        canvasEngine.setSources(sceneManager.getActiveScene().sources);
+        renderSources();
+      }
+    };
+
+    document.getElementById('btn-add-color-src').onclick = () => {
+      addSourceModal.classList.remove('open');
+      sceneManager.addSourceToActive({
+        name: 'Color Backdrop',
+        type: 'color',
+        color: '#0B1026',
+        x: 0, y: 0, width: 1920, height: 1080
+      });
+      canvasEngine.setSources(sceneManager.getActiveScene().sources);
+      renderSources();
+    };
+
+    // Overlay Quick Action Buttons
+    document.getElementById('btn-screen-capture').onclick = activateScreenCapture;
+    document.getElementById('btn-webcam-capture').onclick = activateWebcamCapture;
+
+    // Transform Overlay Controls
+    document.getElementById('btn-fit-screen').onclick = () => {
+      const scene = sceneManager.getActiveScene();
+      const sel = scene.sources.find(s => s.id === sceneManager.selectedSourceId);
+      if (sel) {
+        sel.x = 0;
+        sel.y = 0;
+        sel.width = 1920;
+        sel.height = 1080;
+      }
+    };
+
+    document.getElementById('btn-center-source').onclick = () => {
+      const scene = sceneManager.getActiveScene();
+      const sel = scene.sources.find(s => s.id === sceneManager.selectedSourceId);
+      if (sel) {
+        const w = sel.width || 1920;
+        const h = sel.height || 1080;
+        sel.x = Math.round((1920 - w) / 2);
+        sel.y = Math.round((1080 - h) / 2);
+      }
+    };
+
+    document.getElementById('btn-lock-aspect').onclick = () => {
+      const scene = sceneManager.getActiveScene();
+      const sel = scene.sources.find(s => s.id === sceneManager.selectedSourceId);
+      if (sel) {
+        sel.locked = !sel.locked;
+        renderSources();
+      }
     };
 
     // 6. Render Audio Mixer
@@ -461,12 +742,12 @@
             <span class="db-readout" style="color: var(--gold-bright); font-family: var(--font-mono);">${ch.peakDb} dB</span>
           </div>
           <div class="meter-track">
-            <div class="meter-fill" style="width: 50%;"></div>
+            <div class="meter-fill" style="width: 0%;"></div>
           </div>
           <div class="mixer-controls">
             <button class="icon-btn mute-btn" style="width: 24px; height: 24px;">🔊</button>
             <input type="range" min="0" max="1" step="0.01" value="${ch.volume}" class="volume-slider">
-            <button class="icon-btn" style="width: 24px; height: 24px;">⚙</button>
+            <button class="icon-btn" style="width: 24px; height: 24px;" onclick="audioEngine.requestMicrophoneAccess()">🎤</button>
           </div>
         `;
 
@@ -556,7 +837,15 @@
 
     btnGoLive.onclick = async () => {
       if (!streamEngine.isLive) {
-        await streamEngine.startBroadcast(canvasEngine.getStream(), destinations);
+        // Ensure audio context is active
+        if (!audioEngine.micStream) {
+          await audioEngine.requestMicrophoneAccess();
+        }
+        await streamEngine.startBroadcast(
+          canvasEngine.getStream(),
+          audioEngine.getMixedAudioStream(),
+          destinations
+        );
         btnGoLive.classList.add('live');
         txtGoLive.textContent = 'END BROADCAST';
         renderChannels();
@@ -572,10 +861,24 @@
     // Master Record Button
     const btnRecord = document.getElementById('btn-record');
     const txtRecord = document.getElementById('txt-record');
-    btnRecord.onclick = () => {
-      streamEngine.isRecording = !streamEngine.isRecording;
-      btnRecord.classList.toggle('recording', streamEngine.isRecording);
-      txtRecord.textContent = streamEngine.isRecording ? 'STOP RECORDING' : 'START RECORDING';
+    btnRecord.onclick = async () => {
+      if (!streamEngine.isRecording) {
+        if (!audioEngine.micStream) {
+          await audioEngine.requestMicrophoneAccess();
+        }
+        const started = streamEngine.startRecording(
+          canvasEngine.getStream(),
+          audioEngine.getMixedAudioStream()
+        );
+        if (started) {
+          btnRecord.classList.add('recording');
+          txtRecord.textContent = 'STOP RECORDING';
+        }
+      } else {
+        streamEngine.stopRecording();
+        btnRecord.classList.remove('recording');
+        txtRecord.textContent = 'START RECORDING';
+      }
     };
 
     // Stream Engine Telemetry Hooks
@@ -585,54 +888,17 @@
       document.getElementById('stat-uptime').textContent = streamEngine.getFormattedUptime();
     };
 
-    // 9. Live Screen / Webcam capture triggers
-    document.getElementById('btn-screen-capture').onclick = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        video.autoplay = true;
-        video.muted = true;
-        sceneManager.addSourceToActive({
-          name: 'Live Desktop Display',
-          type: 'display',
-          mediaElement: video
-        });
-        renderSources();
-      } catch (err) {
-        console.log('Screen capture dismissed or cancelled:', err);
-      }
-    };
-
-    document.getElementById('btn-webcam-capture').onclick = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        video.autoplay = true;
-        video.muted = true;
-        sceneManager.addSourceToActive({
-          name: 'Live HD Webcam',
-          type: 'camera',
-          width: 640,
-          height: 360,
-          x: 1240,
-          y: 680,
-          mediaElement: video
-        });
-        renderSources();
-      } catch (err) {
-        console.log('Camera capture dismissed or cancelled:', err);
-      }
-    };
-
-    // Modal Handling
+    // Settings Modal Handling
     const settingsModal = document.getElementById('settings-modal');
     document.getElementById('btn-open-settings').onclick = () => settingsModal.classList.add('open');
     document.getElementById('btn-close-modal').onclick = () => settingsModal.classList.remove('open');
     document.getElementById('btn-cancel-settings').onclick = () => settingsModal.classList.remove('open');
     document.getElementById('btn-save-settings').onclick = () => {
+      const whipKey = document.getElementById('cfg-key').value;
+      const whipDest = destinations.find(d => d.id === 'velora-whip');
+      if (whipDest) whipDest.streamKey = whipKey;
       settingsModal.classList.remove('open');
+      renderChannels();
     };
 
     // Dock Collapse Toggle
@@ -643,3 +909,4 @@
   </script>
 </body>
 </html>
+
