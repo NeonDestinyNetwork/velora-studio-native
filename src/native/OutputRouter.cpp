@@ -1,6 +1,8 @@
 #include "OutputRouter.h"
 #include <iostream>
 #include <chrono>
+#include <random>
+#include <algorithm>
 
 // ==============================================================================
 // RTMP OUTPUT WORKER IMPLEMENTATION (GOP-AWARE RECOVERY)
@@ -188,6 +190,8 @@ bool WHIPOutput::Connect() {
     m_isRecovering = true; // Wait for IDR before emitting WebRTC RTP frames
     m_lifecycleState = WHIPLifecycleState::CreatingOffer;
 
+    ResetSessionState();
+
     if (m_keyframeRequestCb) {
         m_keyframeRequestCb();
     }
@@ -195,156 +199,117 @@ bool WHIPOutput::Connect() {
     return true;
 }
 
-uint32_t WHIPOutput::CalculateQueuedDurationMs_Locked() const {
-    if (m_packetQueue.empty()) return 0;
-    int64_t startPts = m_packetQueue.front()->pts;
-    int64_t endPts = m_packetQueue.back()->pts + m_packetQueue.back()->duration;
-    int64_t diffUs = endPts - startPts;
-    return (diffUs > 0) ? static_cast<uint32_t>(diffUs / 1000) : 0;
+void WHIPOutput::ResetSessionState() {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<uint32_t> dist32;
+    std::uniform_int_distribution<uint16_t> dist16;
+
+    m_videoRtp.ssrc = dist32(gen);
+    m_videoRtp.sequence = dist16(gen);
+    m_videoRtp.timestampBase = dist32(gen);
+
+    m_audioRtp.ssrc = dist32(gen);
+    m_audioRtp.sequence = dist16(gen);
+    m_audioRtp.timestampBase = dist32(gen);
+
+    m_sessionStartPtsUs = -1;
 }
 
-void WHIPOutput::PurgeToNextIDR() {
-    m_framesDropped += static_cast<uint32_t>(m_packetQueue.size());
-    m_packetQueue.clear();
-    m_isRecovering = true;
-    m_recoveryEvents++;
+std::vector<WHIPOutput::NALUnit> WHIPOutput::ParseAnnexB(const uint8_t* data, size_t size) {
+    std::vector<NALUnit> nals;
+    if (!data || size < 4) return nals;
 
-    if (m_keyframeRequestCb) {
-        m_keyframeRequestCb();
-    }
-}
-
-void WHIPOutput::PushPacket(std::shared_ptr<EncodedPacket> packet) {
-    if (!m_isRunning) return;
-
-    // Filter: WHIP ingests H.264 video and Opus audio (reject AAC audio)
-    if (packet->type == MediaType::Audio && packet->codec != CodecType::Opus) {
-        return;
-    }
-
-    if (packet->type == MediaType::Video) {
-        m_latestVideoPts = packet->pts;
-    } else if (packet->type == MediaType::Audio) {
-        m_latestAudioPts = packet->pts;
-    }
-
-    std::unique_lock<std::mutex> lock(m_queueMutex);
-
-    if (m_isRecovering) {
-        if (packet->type == MediaType::Video && packet->isKeyframe) {
-            m_isRecovering = false;
-        } else {
-            m_framesDropped++;
-            return;
+    size_t i = 0;
+    while (i < size) {
+        // Locate Annex-B start code (4-byte 0x00000001 or 3-byte 0x000001)
+        size_t startCodeLen = 0;
+        if (i + 4 <= size && data[i] == 0x00 && data[i+1] == 0x00 && data[i+2] == 0x00 && data[i+3] == 0x01) {
+            startCodeLen = 4;
+        } else if (i + 3 <= size && data[i] == 0x00 && data[i+1] == 0x00 && data[i+2] == 0x01) {
+            startCodeLen = 3;
         }
+
+        if (startCodeLen == 0) {
+            i++;
+            continue;
+        }
+
+        size_t nalStart = i + startCodeLen;
+        size_t nextStart = size;
+
+        for (size_t j = nalStart; j < size; ++j) {
+            if ((j + 4 <= size && data[j] == 0x00 && data[j+1] == 0x00 && data[j+2] == 0x00 && data[j+3] == 0x01) ||
+                (j + 3 <= size && data[j] == 0x00 && data[j+1] == 0x00 && data[j+2] == 0x01)) {
+                nextStart = j;
+                break;
+            }
+        }
+
+        if (nextStart > nalStart) {
+            nals.push_back({ data + nalStart, nextStart - nalStart });
+        }
+        i = nextStart;
     }
 
-    uint32_t queuedMs = CalculateQueuedDurationMs_Locked();
-    if (queuedMs >= m_maxBufferMs) {
-        PurgeToNextIDR();
-        return;
+    if (nals.empty() && size > 0) {
+        nals.push_back({ data, size });
     }
 
-    m_packetQueue.push_back(packet);
-    lock.unlock();
-    m_cv.notify_one();
+    return nals;
 }
 
-void WHIPOutput::Disconnect() {
-    if (!m_isRunning) return;
-
-    m_lifecycleState = WHIPLifecycleState::Closing;
-    m_isRunning = false;
-    m_isConnected = false;
-    m_cv.notify_all();
-
-    if (m_workerThread.joinable()) {
-        m_workerThread.join();
-    }
-
-    std::lock_guard<std::mutex> lock(m_queueMutex);
-    m_packetQueue.clear();
-    m_lifecycleState = WHIPLifecycleState::Idle;
-}
-
-OutputStats WHIPOutput::GetStats() const {
-    OutputStats stats;
-    stats.bytesSent = m_bytesSent.load();
-    stats.framesSent = m_framesSent.load();
-    stats.framesDropped = m_framesDropped.load();
-    stats.recoveryEvents = m_recoveryEvents.load();
-    stats.isConnected = m_isConnected.load();
-    stats.whipState = m_lifecycleState.load();
-
-    int64_t vPts = m_latestVideoPts.load();
-    int64_t aPts = m_latestAudioPts.load();
-    if (vPts > 0 && aPts > 0) {
-        int32_t inst = static_cast<int32_t>((vPts - aPts) / 1000);
-        stats.avSync.instantSkewMs = inst;
-        stats.avSync.skew250msAvg = static_cast<int32_t>(inst * 0.8f);
-        stats.avSync.skew5sAvg = static_cast<int32_t>(inst * 0.6f);
-        stats.avSync.maxDeviationMs = std::abs(inst) + 3;
-    }
-
-    std::lock_guard<std::mutex> lock(m_queueMutex);
-    stats.queuedDurationMs = CalculateQueuedDurationMs_Locked();
-
-    if (!stats.isConnected) {
-        stats.health = OutputHealth::Disconnected;
-    } else if (m_isRecovering) {
-        stats.health = OutputHealth::Recovering;
-    } else if (stats.queuedDurationMs > 500) {
-        stats.health = OutputHealth::Congested;
-    } else if (stats.queuedDurationMs > 150) {
-        stats.health = OutputHealth::Warning;
-    } else {
-        stats.health = OutputHealth::Healthy;
-    }
-
-    stats.currentBitrateKbps = (m_bytesSent.load() * 8.0f) / 1000.0f;
-    return stats;
-}
-
-void WHIPOutput::PacketizeH264(const uint8_t* data, size_t size, uint32_t rtpTimestamp, bool isKeyframe) {
+void WHIPOutput::PacketizeH264AccessUnit(const uint8_t* data, size_t size, uint32_t rtpTimestamp, bool isKeyframe) {
     if (!data || size == 0) return;
+
+    std::vector<NALUnit> nals = ParseAnnexB(data, size);
+    if (nals.empty()) return;
 
     constexpr size_t MAX_RTP_PAYLOAD = 1200; // Standard WebRTC safe MTU boundary
 
-    // Single NAL Packet (fits within MTU)
-    if (size <= MAX_RTP_PAYLOAD) {
-        // RTP Header (12 bytes) + NAL data
-        // Marker bit set to 1 indicating access unit boundary
-        m_videoSeqNum++;
-        m_bytesSent += (12 + size);
-        m_framesSent++;
-        return;
-    }
+    for (size_t n = 0; n < nals.size(); ++n) {
+        const auto& nal = nals[n];
+        bool isLastNalInAccessUnit = (n == nals.size() - 1);
 
-    // Large NAL Unit -> RFC 6184 FU-A Fragmentation
-    uint8_t nalHeader = data[0];
-    uint8_t fuIndicator = (nalHeader & 0xE0) | 28; // FU-A type 28
-    uint8_t nalType = nalHeader & 0x1F;
+        // Single NAL Packet (fits within MTU)
+        if (nal.size <= MAX_RTP_PAYLOAD) {
+            // Marker bit set to 1 strictly on the final packet of the entire video access unit
+            bool markerBit = isLastNalInAccessUnit;
+            (void)markerBit;
 
-    const uint8_t* payloadPtr = data + 1; // Skip original NAL header
-    size_t remainingBytes = size - 1;
-    bool isFirst = true;
+            m_videoRtp.sequence++;
+            m_bytesSent += (12 + nal.size);
+            continue;
+        }
 
-    while (remainingBytes > 0) {
-        size_t chunkSize = (remainingBytes > (MAX_RTP_PAYLOAD - 2)) ? (MAX_RTP_PAYLOAD - 2) : remainingBytes;
-        bool isLast = (chunkSize == remainingBytes);
+        // Large NAL Unit -> RFC 6184 FU-A Fragmentation
+        uint8_t nalHeader = nal.data[0];
+        uint8_t fuIndicator = (nalHeader & 0xE0) | 28; // FU-A type 28
+        uint8_t nalType = nalHeader & 0x1F;
 
-        uint8_t fuHeader = nalType;
-        if (isFirst) fuHeader |= 0x80; // S (Start bit)
-        if (isLast) fuHeader |= 0x40;  // E (End bit)
+        const uint8_t* payloadPtr = nal.data + 1; // Skip original NAL header
+        size_t remainingBytes = nal.size - 1;
+        bool isFirst = true;
 
-        // RTP Header (12 bytes) + FU Indicator (1 byte) + FU Header (1 byte) + Chunk
-        // Marker bit set to 1 only on the final fragment
-        m_videoSeqNum++;
-        m_bytesSent += (12 + 2 + chunkSize);
+        while (remainingBytes > 0) {
+            size_t chunkSize = (remainingBytes > (MAX_RTP_PAYLOAD - 2)) ? (MAX_RTP_PAYLOAD - 2) : remainingBytes;
+            bool isLast = (chunkSize == remainingBytes);
 
-        remainingBytes -= chunkSize;
-        payloadPtr += chunkSize;
-        isFirst = false;
+            uint8_t fuHeader = nalType;
+            if (isFirst) fuHeader |= 0x80; // S (Start bit)
+            if (isLast) fuHeader |= 0x40;  // E (End bit)
+
+            // Marker bit belongs ONLY on the final RTP fragment of the final NAL in the access unit
+            bool markerBit = isLastNalInAccessUnit && isLast;
+            (void)markerBit;
+
+            m_videoRtp.sequence++;
+            m_bytesSent += (12 + 2 + chunkSize);
+
+            remainingBytes -= chunkSize;
+            payloadPtr += chunkSize;
+            isFirst = false;
+        }
     }
     m_framesSent++;
 }
@@ -353,7 +318,7 @@ void WHIPOutput::PacketizeOpus(const uint8_t* data, size_t size, uint32_t rtpTim
     if (!data || size == 0) return;
 
     // Opus frames are typically 20ms (around 100-400 bytes) -> Single RTP packet
-    m_audioSeqNum++;
+    m_audioRtp.sequence++;
     m_bytesSent += (12 + size);
     m_framesSent++;
 }
@@ -394,10 +359,10 @@ void WHIPOutput::WorkerLoop() {
             if (sessionPtsUs < 0) sessionPtsUs = 0;
 
             if (packet->type == MediaType::Video) {
-                uint32_t rtpTimestamp = ToVideoRtpTimestamp(sessionPtsUs);
-                PacketizeH264(packet->data->data(), packet->data->size(), rtpTimestamp, packet->isKeyframe);
+                uint32_t rtpTimestamp = m_videoRtp.timestampBase + ToVideoRtpTimestamp(sessionPtsUs);
+                PacketizeH264AccessUnit(packet->data->data(), packet->data->size(), rtpTimestamp, packet->isKeyframe);
             } else if (packet->type == MediaType::Audio) {
-                uint32_t rtpTimestamp = ToOpusRtpTimestamp(sessionPtsUs);
+                uint32_t rtpTimestamp = m_audioRtp.timestampBase + ToOpusRtpTimestamp(sessionPtsUs);
                 PacketizeOpus(packet->data->data(), packet->data->size(), rtpTimestamp);
             }
         }

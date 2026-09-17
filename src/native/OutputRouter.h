@@ -152,8 +152,21 @@ private:
     void PurgeToNextIDR();
     uint32_t CalculateQueuedDurationMs_Locked() const;
 
-    // RTP Packetizers
-    void PacketizeH264(const uint8_t* data, size_t size, uint32_t rtpTimestamp, bool isKeyframe);
+    // RTP Session State
+    struct RtpStreamState {
+        uint32_t ssrc = 0;
+        uint16_t sequence = 0;
+        uint32_t timestampBase = 0;
+    };
+
+    struct NALUnit {
+        const uint8_t* data = nullptr;
+        size_t size = 0;
+    };
+
+    void ResetSessionState();
+    static std::vector<NALUnit> ParseAnnexB(const uint8_t* data, size_t size);
+    void PacketizeH264AccessUnit(const uint8_t* data, size_t size, uint32_t rtpTimestamp, bool isKeyframe);
     void PacketizeOpus(const uint8_t* data, size_t size, uint32_t rtpTimestamp);
 
     std::string m_id;
@@ -172,10 +185,10 @@ private:
     std::thread m_workerThread;
     KeyframeRequestCallback m_keyframeRequestCb = nullptr;
 
-    // Session Epoch (microsecond PTS offset)
+    // Session Epoch & Randomized RTP Stream State
     std::atomic<int64_t> m_sessionStartPtsUs{ -1 };
-    uint16_t m_videoSeqNum = 0;
-    uint16_t m_audioSeqNum = 0;
+    RtpStreamState m_videoRtp;
+    RtpStreamState m_audioRtp;
 
     std::deque<std::shared_ptr<EncodedPacket>> m_packetQueue;
     mutable std::mutex m_queueMutex;
