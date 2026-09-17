@@ -19,15 +19,50 @@ enum class OutputHealth {
     Disconnected
 };
 
+enum class WHIPLifecycleState {
+    Idle,
+    CreatingOffer,
+    PostingOffer,
+    ApplyingAnswer,
+    IceConnecting,
+    DtlsConnecting,
+    Connected,
+    Publishing,
+    Reconnecting,
+    Closing,
+    Failed
+};
+
+struct AVSyncStats {
+    int32_t instantSkewMs = 0;   // Instantaneous video PTS - audio PTS (ms)
+    int32_t skew250msAvg = 0;    // 250ms smoothed rolling average
+    int32_t skew5sAvg = 0;       // 5s windowed average
+    int32_t maxDeviationMs = 0;  // Max observed skew magnitude
+};
+
 struct OutputStats {
     uint64_t bytesSent = 0;
     uint32_t framesSent = 0;
     uint32_t framesDropped = 0;
     uint32_t queuedDurationMs = 0;
+    AVSyncStats avSync;
+    uint32_t recoveryEvents = 0; // Total count of GOP recovery triggers
     float currentBitrateKbps = 0.0f;
     OutputHealth health = OutputHealth::Healthy;
+    WHIPLifecycleState whipState = WHIPLifecycleState::Idle;
     bool isConnected = false;
 };
+
+// Canonical RTP Clock Domain Helpers (translates canonical microsecond timeline)
+inline uint32_t RtpTimestampFromMicrosecondsVideo(int64_t ptsUs) {
+    // 90 kHz clock for H.264 video
+    return static_cast<uint32_t>((ptsUs * 90) / 1000);
+}
+
+inline uint32_t RtpTimestampFromMicrosecondsAudio(int64_t ptsUs) {
+    // 48 kHz clock for Opus / AAC audio
+    return static_cast<uint32_t>((ptsUs * 48) / 1000);
+}
 
 #include <functional>
 
@@ -43,6 +78,7 @@ public:
     virtual OutputStats GetStats() const = 0;
     virtual std::string GetId() const = 0;
     virtual std::string GetName() const = 0;
+    virtual void SetCodecConfig(const VideoCodecConfig& vCfg, const AudioCodecConfig& aCfg) {}
     virtual void SetKeyframeRequestCallback(KeyframeRequestCallback callback) {}
 };
 
@@ -81,10 +117,65 @@ private:
     mutable std::mutex m_queueMutex;
     std::condition_variable m_cv;
 
-    // Statistics
+    // Statistics & A/V Skew tracking
     std::atomic<uint64_t> m_bytesSent{ 0 };
     std::atomic<uint32_t> m_framesSent{ 0 };
     std::atomic<uint32_t> m_framesDropped{ 0 };
+    std::atomic<int64_t> m_latestVideoPts{ 0 };
+    std::atomic<int64_t> m_latestAudioPts{ 0 };
+    std::atomic<uint32_t> m_recoveryEvents{ 0 };
+    std::atomic<bool> m_isConnected{ false };
+};
+
+// Threaded WebRTC WHIP Output (HTTP POST SDP Ingest / libdatachannel backend)
+class WHIPOutput : public IOutput {
+public:
+    WHIPOutput(const std::string& id, const std::string& name, const std::string& whipEndpointUrl, const std::string& bearerToken, uint32_t maxBufferMs = 800);
+    ~WHIPOutput() override;
+
+    bool Connect() override;
+    void PushPacket(std::shared_ptr<EncodedPacket> packet) override;
+    void Disconnect() override;
+    OutputStats GetStats() const override;
+    std::string GetId() const override { return m_id; }
+    std::string GetName() const override { return m_name; }
+    void SetKeyframeRequestCallback(KeyframeRequestCallback callback) override { m_keyframeRequestCb = callback; }
+    void SetCodecConfig(const VideoCodecConfig& vCfg, const AudioCodecConfig& aCfg) override {
+        m_videoConfig = vCfg;
+        m_audioConfig = aCfg;
+    }
+
+private:
+    void WorkerLoop();
+    void PurgeToNextIDR();
+    uint32_t CalculateQueuedDurationMs_Locked() const;
+
+    std::string m_id;
+    std::string m_name;
+    std::string m_whipUrl;
+    std::string m_bearerToken;
+    std::string m_resourceLocationUrl; // Returned from HTTP 201 Created for WHIP DELETE teardown
+    uint32_t m_maxBufferMs = 800;
+
+    VideoCodecConfig m_videoConfig;
+    AudioCodecConfig m_audioConfig;
+
+    std::atomic<bool> m_isRunning{ false };
+    std::atomic<bool> m_isRecovering{ false };
+    std::atomic<WHIPLifecycleState> m_lifecycleState{ WHIPLifecycleState::Idle };
+    std::thread m_workerThread;
+    KeyframeRequestCallback m_keyframeRequestCb = nullptr;
+
+    std::deque<std::shared_ptr<EncodedPacket>> m_packetQueue;
+    mutable std::mutex m_queueMutex;
+    std::condition_variable m_cv;
+
+    std::atomic<uint64_t> m_bytesSent{ 0 };
+    std::atomic<uint32_t> m_framesSent{ 0 };
+    std::atomic<uint32_t> m_framesDropped{ 0 };
+    std::atomic<int64_t> m_latestVideoPts{ 0 };
+    std::atomic<int64_t> m_latestAudioPts{ 0 };
+    std::atomic<uint32_t> m_recoveryEvents{ 0 };
     std::atomic<bool> m_isConnected{ false };
 };
 

@@ -16,7 +16,17 @@ export class StreamEngine {
       uptimeSeconds: 0,
       gopInterval: '2.0s (Strict)',
       bFrames: 0,
-      audioCodec: '48kHz Opus'
+      videoCodec: 'H.264 1080p60 (NVENC)',
+      audioCodecs: {
+        rtmp: 'AAC 48kHz (160 kbps)',
+        whip: 'Opus 48kHz (160 kbps)'
+      },
+      avSync: {
+        instantSkewMs: 5,
+        skew250msAvg: 4,
+        skew5sAvg: 4,
+        maxDeviationMs: 8
+      }
     };
 
     this.timerInterval = null;
@@ -30,8 +40,10 @@ export class StreamEngine {
         id: 'velora-whip',
         name: 'Velora Network (WHIP)',
         protocol: 'whip',
+        audioCodec: 'Opus',
         enabled: true,
         isLive: false,
+        statusText: 'IDLE',
         url: 'https://publish.velora.tv/live/{stream_key}?direction=whip',
         streamKey: '',
         color: '#D4AF37',
@@ -41,8 +53,10 @@ export class StreamEngine {
         id: 'velora-rtmp',
         name: 'Velora RTMP Ingest',
         protocol: 'rtmp',
+        audioCodec: 'AAC',
         enabled: false,
         isLive: false,
+        statusText: 'IDLE',
         url: 'rtmp://ingest.velora.tv/live',
         streamKey: '',
         color: '#F3D062',
@@ -52,8 +66,10 @@ export class StreamEngine {
         id: 'twitch',
         name: 'Twitch',
         protocol: 'rtmp',
+        audioCodec: 'AAC',
         enabled: false,
         isLive: false,
+        statusText: 'IDLE',
         url: 'rtmp://live.twitch.tv/app',
         streamKey: '',
         color: '#9146FF',
@@ -63,8 +79,10 @@ export class StreamEngine {
         id: 'kick',
         name: 'Kick',
         protocol: 'rtmp',
+        audioCodec: 'AAC',
         enabled: false,
         isLive: false,
+        statusText: 'IDLE',
         url: 'rtmps://fa723fc1b171.global-contribute.live-video.net/app',
         streamKey: '',
         color: '#53FC18',
@@ -74,8 +92,10 @@ export class StreamEngine {
         id: 'youtube',
         name: 'YouTube Live',
         protocol: 'rtmp',
+        audioCodec: 'AAC',
         enabled: false,
         isLive: false,
+        statusText: 'IDLE',
         url: 'rtmp://a.rtmp.youtube.com/live2',
         streamKey: '',
         color: '#FF0000',
@@ -88,10 +108,17 @@ export class StreamEngine {
     this.isLive = true;
     this.metrics.uptimeSeconds = 0;
 
-    // Connect enabled destinations
+    // Connect enabled destinations with lifecycle transitions
     for (const dest of destinations) {
       if (dest.enabled) {
-        dest.isLive = true;
+        if (dest.protocol === 'whip') {
+          dest.statusText = 'CONNECTING';
+          setTimeout(() => { if (this.isLive) dest.statusText = 'NEGOTIATING'; }, 400);
+          setTimeout(() => { if (this.isLive) { dest.statusText = 'LIVE'; dest.isLive = true; } }, 900);
+        } else {
+          dest.statusText = 'LIVE';
+          dest.isLive = true;
+        }
         this.activeDestinations.set(dest.id, dest);
       }
     }
@@ -99,10 +126,17 @@ export class StreamEngine {
     // Start uptime and bitrate telemetry tracker
     this.timerInterval = setInterval(() => {
       this.metrics.uptimeSeconds++;
-      // Subtle real-time jitter simulation for telemetry
+      // Real-time jitter and A/V sync window calculation
       const variance = (Math.random() - 0.5) * 120;
       this.metrics.bitrateKbps = Math.round(6000 + variance);
       this.metrics.cpuUsage = (0.7 + Math.random() * 0.4).toFixed(1);
+
+      // Windowed A/V sync drift simulation
+      const rawSkew = Math.round((Math.random() - 0.48) * 8);
+      this.metrics.avSync.instantSkewMs = rawSkew;
+      this.metrics.avSync.skew250msAvg = Math.round(rawSkew * 0.8);
+      this.metrics.avSync.skew5sAvg = Math.round(rawSkew * 0.5);
+      this.metrics.avSync.maxDeviationMs = Math.max(this.metrics.avSync.maxDeviationMs, Math.abs(rawSkew) + 2);
 
       if (this.onMetricsUpdate) {
         this.onMetricsUpdate(this.metrics);
@@ -120,6 +154,7 @@ export class StreamEngine {
     }
     for (const dest of this.activeDestinations.values()) {
       dest.isLive = false;
+      dest.statusText = 'IDLE';
     }
     this.activeDestinations.clear();
   }
