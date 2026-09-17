@@ -60,7 +60,7 @@ jobs:
         shell: cmd
         run: |
           echo Compiling Native Windows Broadcast Engine...
-          cl /nologo /std:c++20 /O2 /EHsc /Fe:dist\VeloraStudioEngine.exe src\native\main.cpp src\native\D3D11Renderer.cpp src\native\CaptureEngine.cpp src\native\AudioMixer.cpp src\native\HardwareEncoder.cpp src\native\OutputRouter.cpp /link /SUBSYSTEM:WINDOWS d3d11.lib dxgi.lib d3dcompiler.lib ole32.lib user32.lib shell32.lib
+          cl /nologo /std:c++20 /O2 /EHsc /Fe:dist\VeloraStudioEngine.exe src\native\main.cpp src\native\D3D11Renderer.cpp src\native\CaptureEngine.cpp src\native\AudioMixer.cpp src\native\HardwareEncoder.cpp src\native\OutputRouter.cpp /link /SUBSYSTEM:WINDOWS d3d11.lib dxgi.lib d3dcompiler.lib ole32.lib user32.lib gdi32.lib shell32.lib
 
       - name: Upload Velora Studio Windows Package
         uses: actions/upload-artifact@v4

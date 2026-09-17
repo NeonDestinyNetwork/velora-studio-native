@@ -26,6 +26,7 @@ if (WIN32)
         d3dcompiler
         ole32
         user32
+        gdi32
         shell32
     )
 else()
