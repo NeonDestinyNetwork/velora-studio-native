@@ -11,6 +11,12 @@ jobs:
     runs-on: windows-2022
 
     steps:
+      - name: Enable Windows Long Paths
+        shell: cmd
+        run: |
+          reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v "LongPathsEnabled" /t REG_DWORD /d 1 /f
+          git config --system core.longpaths true
+
       - name: Checkout Velora Studio Customizations
         uses: actions/checkout@v4
         with:
@@ -68,7 +74,7 @@ jobs:
         working-directory: prism-src/src/prism-live-studio/build/Release
         run: |
           echo Compiling Primary Velora Studio Solution...
-          msbuild prism-live-studio.sln /p:Configuration=RelWithDebInfo /p:Platform=x64 /p:TreatWarningsAsErrors=false /p:WarningLevel=3 /m /verbosity:minimal
+          msbuild prism-live-studio.sln /p:Configuration=RelWithDebInfo /p:Platform=x64 /p:TreatWarningsAsErrors=false /p:TrackFileAccess=false /p:WarningLevel=3 /m /verbosity:minimal
 
       - name: Package Complete Velora Studio Distribution (Full FFmpeg, OBS-Deps & Qt Suite)
         shell: bash
@@ -149,6 +155,13 @@ jobs:
           cp velora-custom/theme/* dist/bin/64bit/data/obs-studio/themes/ 2>/dev/null || true
           cp velora-custom/theme/* dist/data/prism/themes/ 2>/dev/null || true
           cp velora-custom/theme/* dist/bin/64bit/data/prism/themes/ 2>/dev/null || true
+
+          # Inject default Velora Profile with fixed 2-second keyframes
+          mkdir -p dist/data/obs-studio/basic/profiles/Velora dist/bin/64bit/data/obs-studio/basic/profiles/Velora dist/data/prism/basic/profiles/Velora dist/bin/64bit/data/prism/basic/profiles/Velora
+          cp velora-custom/config/default-profile/basic.ini dist/data/obs-studio/basic/profiles/Velora/basic.ini 2>/dev/null || true
+          cp velora-custom/config/default-profile/basic.ini dist/bin/64bit/data/obs-studio/basic/profiles/Velora/basic.ini 2>/dev/null || true
+          cp velora-custom/config/default-profile/basic.ini dist/data/prism/basic/profiles/Velora/basic.ini 2>/dev/null || true
+          cp velora-custom/config/default-profile/basic.ini dist/bin/64bit/data/prism/basic/profiles/Velora/basic.ini 2>/dev/null || true
 
           # Mirror data and plugins to bin/64bit so relative lookups always resolve
           mkdir -p dist/bin/64bit/data dist/bin/64bit/obs-plugins
