@@ -2,111 +2,74 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <shellapi.h>
-#include "D3D11Renderer.h"
-#include "CaptureEngine.h"
-#include "AudioMixer.h"
+#include <shlobj.h>
 #endif
 
 #include "HardwareEncoder.h"
 #include "OutputRouter.h"
 #include <iostream>
-#include <thread>
-#include <chrono>
+#include <string>
+#include <vector>
 
 #ifdef _WIN32
-// Forward declaration of Window Procedure
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    // 1. Register Studio Window Class
-    const wchar_t CLASS_NAME[] = L"VeloraStudioMainWindowClass";
+    // 1. Resolve application and index.html path
+    wchar_t exePath[MAX_PATH];
+    GetModuleFileNameW(NULL, exePath, MAX_PATH);
+    std::wstring path(exePath);
+    size_t pos = path.find_last_of(L"\\/");
+    std::wstring baseDir = (pos != std::wstring::npos) ? path.substr(0, pos) : L".";
+    std::wstring htmlPath = baseDir + L"\\index.html";
 
-    WNDCLASSEXW wcex = {};
-    wcex.cbSize = sizeof(WNDCLASSEX);
-    wcex.style = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc = WndProc;
-    wcex.hInstance = hInstance;
-    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
-    wcex.lpszClassName = CLASS_NAME;
+    // 2. Locate Microsoft Edge or Chromium for standalone App Mode window
+    std::vector<std::wstring> possibleBrowserPaths = {
+        L"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+        L"C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+        L"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        L"C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+    };
 
-    RegisterClassExW(&wcex);
-
-    // 2. Create Window with Velora Obsidian style
-    HWND hWnd = CreateWindowExW(
-        WS_EX_APPWINDOW,
-        CLASS_NAME,
-        L"Velora Studio Native — Broadcast Suite",
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 1280, 800,
-        nullptr, nullptr, hInstance, nullptr
-    );
-
-    if (!hWnd) return 0;
-
-    ShowWindow(hWnd, nCmdShow);
-    UpdateWindow(hWnd);
-
-    // 3. Initialize Engine Components
-    D3D11Renderer renderer;
-    if (renderer.Initialize(hWnd, 1920, 1080)) {
-        CaptureEngine capture(renderer.GetDevice(), renderer.GetContext());
-        capture.InitializeDisplayCapture(0);
-
-        AudioMixer audio;
-        audio.Initialize(48000, 2);
-        audio.Start();
-
-        HardwareEncoder encoder;
-        EncoderConfig encCfg;
-        encCfg.bitrateKbps = 6000;
-        encCfg.keyframeIntervalSec = 2; // Strict 2.0s GOP
-        encCfg.bFrames = 0;             // 0 B-frames
-        encoder.Initialize(renderer.GetDevice(), encCfg);
-
-        // 4. Initialize OutputRouter with RTMP fan-out & local recording
-        OutputRouter router;
-        router.SetKeyframeRequestCallback([&encoder]() {
-            encoder.RequestKeyframe();
-        });
-
-        auto veloraWHIP = std::make_shared<WHIPOutput>("velora-whip", "Velora WHIP", "https://publish.velora.tv/live/live_key?direction=whip", "bearer_token");
-        veloraWHIP->Connect();
-        router.RegisterOutput(veloraWHIP);
-
-        auto veloraRTMP = std::make_shared<RTMPOutput>("velora-rtmp", "Velora RTMP", "rtmp://ingest.velora.tv/live", "live_key");
-        veloraRTMP->Connect();
-        router.RegisterOutput(veloraRTMP);
-
-        // 5. Launch Studio UI Shell
-        wchar_t exePath[MAX_PATH];
-        GetModuleFileNameW(NULL, exePath, MAX_PATH);
-        std::wstring path(exePath);
-        size_t pos = path.find_last_of(L"\\/");
-        std::wstring baseDir = (pos != std::wstring::npos) ? path.substr(0, pos) : L".";
-        std::wstring htmlPath = baseDir + L"\\index.html";
-
-        ShellExecuteW(NULL, L"open", htmlPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
+    std::wstring browserExe = L"";
+    for (const auto& p : possibleBrowserPaths) {
+        DWORD attribs = GetFileAttributesW(p.c_str());
+        if (attribs != INVALID_FILE_ATTRIBUTES && !(attribs & FILE_ATTRIBUTE_DIRECTORY)) {
+            browserExe = p;
+            break;
+        }
     }
 
-    // Main Message Loop
-    MSG msg = {};
-    while (GetMessage(&msg, nullptr, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+    // 3. Formulate App Mode parameters
+    if (!browserExe.empty()) {
+        wchar_t appData[MAX_PATH];
+        SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, appData);
+        std::wstring userProfile = std::wstring(appData) + L"\\VeloraStudioNative";
+
+        std::wstring args = L"--app=\"file:///" + htmlPath + L"\" "
+                            L"--window-size=1360,860 "
+                            L"--user-data-dir=\"" + userProfile + L"\" "
+                            L"--enable-features=WebRtcHideLocalIpsWithMdns "
+                            L"--autoplay-policy=no-user-gesture-required "
+                            L"--enable-media-stream";
+
+        STARTUPINFOW si = { sizeof(STARTUPINFOW) };
+        PROCESS_INFORMATION pi = {};
+
+        std::wstring cmdLine = L"\"" + browserExe + L"\" " + args;
+
+        std::vector<wchar_t> cmdBuffer(cmdLine.begin(), cmdLine.end());
+        cmdBuffer.push_back(0);
+
+        if (CreateProcessW(NULL, cmdBuffer.data(), NULL, NULL, FALSE, 0, NULL, baseDir.c_str(), &si, &pi)) {
+            CloseHandle(pi.hThread);
+            // Keep process handle alive until closed
+            WaitForSingleObject(pi.hProcess, INFINITE);
+            CloseHandle(pi.hProcess);
+            return 0;
+        }
     }
 
-    return (int)msg.wParam;
-}
-
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
-    switch (message) {
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        break;
-    default:
-        return DefWindowProc(hWnd, message, wParam, lParam);
-    }
+    // Fallback: Default system browser handler
+    ShellExecuteW(NULL, L"open", htmlPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
     return 0;
 }
 #else
