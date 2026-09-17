@@ -277,35 +277,77 @@ class CanvasEngine {
 
   drawSourceInteractiveCard(source, x, y, w, h) {
     this.ctx.save();
-    this.ctx.fillStyle = 'rgba(11, 16, 38, 0.85)';
+    
+    // Background gradient
+    const bgGrad = this.ctx.createLinearGradient(x, y, x, y + h);
+    bgGrad.addColorStop(0, '#060B1F');
+    bgGrad.addColorStop(1, '#02040D');
+    this.ctx.fillStyle = bgGrad;
     this.ctx.fillRect(x, y, w, h);
 
-    this.ctx.strokeStyle = 'rgba(212, 175, 55, 0.4)';
-    this.ctx.lineWidth = 1.5;
+    // Glowing border
+    this.ctx.strokeStyle = 'rgba(212, 175, 55, 0.6)';
+    this.ctx.lineWidth = 2;
     this.ctx.strokeRect(x, y, w, h);
 
     const isCam = source.type === 'camera';
-    const icon = isCam ? '📷' : '🖥️';
-    const title = source.name;
-    const prompt = isCam ? '▶ Click "📷 Camera" on toolbar to activate' : '▶ Click "🖥️ Screen" on toolbar to capture desktop';
+    const isDisplay = source.type === 'display';
 
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
+    if (isDisplay && w > 800) {
+      // Dynamic animated laser scan line across screen
+      const time = performance.now() / 1000;
+      const scanY = y + ((time * 120) % h);
+      this.ctx.strokeStyle = 'rgba(212, 175, 55, 0.35)';
+      this.ctx.lineWidth = 2;
+      this.ctx.beginPath();
+      this.ctx.moveTo(x, scanY);
+      this.ctx.lineTo(x + w, scanY);
+      this.ctx.stroke();
 
-    // Icon
-    this.ctx.font = '36px Inter, sans-serif';
-    this.ctx.fillStyle = '#D4AF37';
-    this.ctx.fillText(icon, x + w / 2, y + h / 2 - 24);
+      // Top corner badge
+      this.ctx.fillStyle = '#D4AF37';
+      this.ctx.font = 'bold 13px Inter, sans-serif';
+      this.ctx.textAlign = 'left';
+      this.ctx.fillText('🔴 VELORA STUDIO LIVE ENGINE • 1080P 60FPS • NVENC PIPELINE', x + 24, y + 36);
 
-    // Title
-    this.ctx.font = 'bold 16px Inter, sans-serif';
-    this.ctx.fillStyle = '#FFFFFF';
-    this.ctx.fillText(title, x + w / 2, y + h / 2 + 16);
+      // Center CTA Button Card
+      const btnW = 440;
+      const btnH = 64;
+      const btnX = x + (w - btnW) / 2;
+      const btnY = y + (h - btnH) / 2;
 
-    // Subtitle Prompt
-    this.ctx.font = '12px Inter, sans-serif';
-    this.ctx.fillStyle = '#D4AF37';
-    this.ctx.fillText(prompt, x + w / 2, y + h / 2 + 40);
+      this.ctx.fillStyle = 'rgba(212, 175, 55, 0.15)';
+      this.ctx.fillRect(btnX, btnY, btnW, btnH);
+      this.ctx.strokeStyle = '#D4AF37';
+      this.ctx.lineWidth = 2;
+      this.ctx.strokeRect(btnX, btnY, btnW, btnH);
+
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.font = 'bold 18px Inter, sans-serif';
+      this.ctx.fillStyle = '#FFE58F';
+      this.ctx.fillText('🖥️ Click "🖥️ Capture Screen" Below', btnX + btnW / 2, btnY + btnH / 2 - 2);
+
+      // Subtitle
+      this.ctx.font = '13px Inter, sans-serif';
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      this.ctx.fillText('Select your monitor or game window to stream directly at 60 FPS', x + w / 2, btnY + btnH + 30);
+    } else {
+      // Camera or compact layer
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.font = '32px Inter, sans-serif';
+      this.ctx.fillStyle = '#D4AF37';
+      this.ctx.fillText(isCam ? '📷' : '🖥️', x + w / 2, y + h / 2 - 20);
+
+      this.ctx.font = 'bold 14px Inter, sans-serif';
+      this.ctx.fillStyle = '#FFFFFF';
+      this.ctx.fillText(source.name, x + w / 2, y + h / 2 + 14);
+
+      this.ctx.font = '11px Inter, sans-serif';
+      this.ctx.fillStyle = '#D4AF37';
+      this.ctx.fillText(isCam ? 'Click "📷 Turn On Camera"' : 'Click "🖥️ Capture Screen"', x + w / 2, y + h / 2 + 36);
+    }
 
     this.ctx.restore();
   }

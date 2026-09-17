@@ -226,40 +226,46 @@ body {
 
 .canvas-controls-overlay {
   position: absolute;
-  bottom: 12px;
+  bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(4, 8, 23, 0.88);
-  backdrop-filter: blur(16px);
+  background: rgba(4, 8, 23, 0.94);
+  backdrop-filter: blur(20px);
   padding: 6px 14px;
-  border-radius: 24px;
+  border-radius: 30px;
   border: 1px solid var(--border-glass);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
-  z-index: 10;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.8), 0 0 12px rgba(212, 175, 55, 0.15);
+  z-index: 100;
   white-space: nowrap;
 }
 
 .btn-tool {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #E2E8F0;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 11px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #F8FAFC;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 12px;
   font-weight: 600;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
 }
 .btn-tool:hover {
   background: var(--gold-dim);
   border-color: var(--gold-primary);
   color: var(--gold-bright);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.25);
+}
+.btn-tool:active {
+  transform: translateY(0);
 }
 
 /* Right Chat & Widgets Dock */
