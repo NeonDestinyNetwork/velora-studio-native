@@ -105,9 +105,7 @@ jobs:
             cp -r "$ldir"/* dist/bin/64bit/locales/ 2>/dev/null || true
           done
           
-          # Enable portable mode to keep configs localized
-          touch dist/bin/64bit/obs_portable_mode
-          touch dist/obs_portable_mode
+          # Add portable-mode markers only after building the installed package.
           
           # 3. Copy internal common-libs and OBS DLLs into bin/64bit
           echo "Bundling compiled core DLLs..."
@@ -170,23 +168,23 @@ jobs:
           cp -r "$QT_PLUGINS/networkinformation" dist/bin/64bit/ 2>/dev/null || true
           cp -r "$QT_PLUGINS/multimedia" dist/bin/64bit/ 2>/dev/null || true
 
-          # 7. Ensure genuine PRISM Live Studio UI binary is used as VeloraStudio.exe
-          echo "Locating genuine PRISM Live Studio UI binary..."
-          PRISM_BIN=""
-          if [ -f "prism-src/src/prism-live-studio/build/Release/prism-live-studio/PRISMLiveStudio/RelWithDebInfo/obs64.exe" ]; then
-            PRISM_BIN="prism-src/src/prism-live-studio/build/Release/prism-live-studio/PRISMLiveStudio/RelWithDebInfo/obs64.exe"
-          elif [ -f "prism-src/bin/prism/windows/Release/bin/64bit/PRISMLiveStudio.exe" ]; then
-            PRISM_BIN="prism-src/bin/prism/windows/Release/bin/64bit/PRISMLiveStudio.exe"
+          # 7. Preserve PRISM's small daemon; obs64.exe is the frontend.
+          DAEMON_BIN="prism-src/bin/prism/windows/Release/bin/64bit/PRISMLiveStudio.exe"
+          UI_BIN="prism-src/src/prism-live-studio/build/Release/prism-live-studio/PRISMLiveStudio/RelWithDebInfo/obs64.exe"
+          if [ ! -f "$UI_BIN" ]; then
+            UI_BIN="prism-src/bin/prism/windows/Release/bin/64bit/obs64.exe"
           fi
-
-          if [ -n "$PRISM_BIN" ]; then
-            echo "Installing PRISM UI binary from: $PRISM_BIN"
-            cp "$PRISM_BIN" dist/bin/64bit/VeloraStudio.exe
-            cp "$PRISM_BIN" dist/bin/64bit/PRISMLiveStudio.exe
-          fi
+          test -f "$DAEMON_BIN" && test -f "$UI_BIN"
+          DAEMON_SIZE=$(wc -c < "$DAEMON_BIN")
+          UI_SIZE=$(wc -c < "$UI_BIN")
+          test "$DAEMON_SIZE" -lt 1000000
+          test "$UI_SIZE" -gt 1000000
+          cp "$DAEMON_BIN" dist/bin/64bit/PRISMLiveStudio.exe
+          cp "$DAEMON_BIN" dist/bin/64bit/VeloraStudio.exe
+          cp "$UI_BIN" dist/bin/64bit/obs64.exe
 
           # 8. Run windeployqt to guarantee all dependencies
-          "$QT_BIN/windeployqt.exe" --release --no-translations dist/bin/64bit/VeloraStudio.exe --dir dist/bin/64bit 2>/dev/null || true
+          "$QT_BIN/windeployqt.exe" --release --no-translations dist/bin/64bit/obs64.exe --dir dist/bin/64bit 2>/dev/null || true
 
           # 9. Create 1-Click Root Launcher batch script
           printf '@echo off\r\ncd /d "%%~dp0bin\\64bit"\r\nif exist "VeloraStudio.exe" (\r\n    start "" "VeloraStudio.exe" %%*\r\n) else if exist "PRISMLiveStudio.exe" (\r\n    start "" "PRISMLiveStudio.exe" %%*\r\n)\r\n' > "dist/Launch Velora Studio.bat"
@@ -204,6 +202,12 @@ jobs:
           echo Building NSIS Setup Installer...
           if not exist "dist-installer" mkdir dist-installer
           makensis /DSOURCEDIR="%CD%\dist" /DOUTDIR="%CD%\dist-installer" velora-custom\installer\velora-installer.nsi
+
+      - name: Enable Portable Profile for Portable Artifact
+        shell: bash
+        run: |
+          touch dist/bin/64bit/obs_portable_mode
+          touch dist/obs_portable_mode
 
       - name: Upload Velora Studio Portable Package
         uses: actions/upload-artifact@v4
